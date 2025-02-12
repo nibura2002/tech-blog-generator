@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Tech Blog Preview</title>
+</head>
+<body>
+    <h1>Tech Blog Preview</h1>
+    <form method="POST">
+        <textarea name="edited_markdown" rows="25" cols="100">{{ blog_markdown|e }}</textarea><br><br>
+        <button type="submit">プレビューを更新</button>
+    </form>
+    <hr>
+    <h2>プレビュー (MarkdownをHTMLに変換した結果)</h2>
+    <div style="border: 1px solid #ccc; padding: 1em;">
+        {{ converted_html|safe }}
+    </div>
+    <br>
+    <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
+    <br><br>
+    <a href="{{ url_for('index') }}">最初の画面へ戻る</a>
+</body>
+</html>

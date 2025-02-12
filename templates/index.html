@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Tech Blog Generator</title>
+</head>
+<body>
+    <h1>Tech Blog Generator</h1>
+    <form method="POST" enctype="multipart/form-data">
+        <!-- プロジェクトフォルダの選択（GUIでフォルダ内の全ファイルをアップロード） -->
+        <label>プロジェクトのフォルダ選択:
+            <input type="file" name="project_folder" webkitdirectory directory multiple>
+        </label>
+        <br><br>
+        <!-- Github URL の入力 -->
+        <label>GithubリポジトリのURL:
+            <input type="url" name="github_url" style="width: 400px;" placeholder="https://github.com/your-repo">
+        </label>
+        <br><br>
+        <label>ターゲット読者層:
+            <input type="text" name="target_audience" value="エンジニア全般" style="width: 400px;">
+        </label>
+        <br><br>
+        <label>ブログのトーン:
+            <input type="text" name="blog_tone" value="カジュアルだけど専門性を感じるトーン" style="width: 400px;">
+        </label>
+        <br><br>
+        <!-- 言語選択 -->
+        <label>言語の選択:
+            <select name="language">
+                <option value="ja" selected>日本語</option>
+                <option value="en">English</option>
+                <!-- 必要に応じて他の言語も追加 -->
+            </select>
+        </label>
+        <br><br>
+        <label>その他リクエスト:
+            <textarea name="additional_requirements" rows="3" cols="50"></textarea>
+        </label>
+        <br><br>
+        <button type="submit">テックブログを生成する</button>
+    </form>
+
+    {% with messages = get_flashed_messages(category_filter=["error", "info", "warning"]) %}
+      {% if messages %}
+        <ul>
+          {% for message in messages %}
+            <li>{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <!-- 進捗表示エリア -->
+    <div id="progress" style="border: 1px solid #ccc; padding: 1em; margin-top: 1em;">
+        進捗情報をここに表示します…
+    </div>
+
+    <!-- AJAX ポーリング & 自動リダイレクト用 JavaScript -->
+    <script>
+    {% if progress_id %}
+      function fetchProgress() {
+          fetch("/progress")
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("progress").innerText = data.progress;
+                // 進捗ログに「最終記事生成完了。」が含まれている場合、プレビュー画面へ自動遷移
+                if (data.progress.includes("最終記事生成完了。")) {
+                    window.location.href = "/preview_blog";
+                }
+            })
+            .catch(err => console.error(err));
+      }
+      // 3秒ごとに進捗を取得
+      setInterval(fetchProgress, 3000);
+    {% endif %}
+    </script>
+</body>
+</html>
