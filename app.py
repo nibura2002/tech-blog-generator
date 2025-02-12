@@ -76,11 +76,15 @@ def read_project_files(root_dir):
 def get_directory_tree(root_dir):
     tree_lines = []
     for dirpath, dirnames, filenames in os.walk(root_dir):
+        # ルートからの相対階層数を計算
         level = dirpath.replace(root_dir, '').count(os.sep)
-        indent = ' ' * 4 * level
-        tree_lines.append(f"{indent}{os.path.basename(dirpath)}/")
+        # 各階層に適切なツリー記号を追加
+        indent = "│   " * level
+        # 現在のディレクトリ行を作成
+        tree_lines.append(f"{indent}├── {os.path.basename(dirpath)}/")
+        # 各ファイルを表示
         for f in filenames:
-            tree_lines.append(f"{indent}    {f}")
+            tree_lines.append(f"{indent}│   ├── {f}")
     return "\n".join(tree_lines)
 
 def strip_code_fences(text: str) -> str:
@@ -110,47 +114,61 @@ file_role_prompt_template = PromptTemplate(
 code_detail_prompt_template = PromptTemplate(
     input_variables=["file_content", "file_path"],
     template="""
-以下はファイル「{file_path}」のコードです。  
-このコードの主要な処理の流れ、設計意図、エラーハンドリングなどを詳細に解説してください。  
-コードブロックは完全な内容を示し、必要に応じて重要な部分を引用して解説してください。
+以下はファイル「{file_path}」の完全なコードです。  
+出力は次の2部構成としてください。
 
-ファイルのコード:
+1. **機能概要**  
+   - このセクションでは、ファイルの主要な機能、処理の流れ、設計意図、及びエラーハンドリングの実装などについて、簡潔かつ具体的に説明してください。
+   - 例：「このファイルはFlaskアプリケーションのルーティングを定義しており、環境変数のロードやエラーハンドリングの実装により安定した動作を実現しています。」
+
+2. **コード全文**  
+   - このセクションでは、ファイル内のコード全文をそのまま表示するコードブロックを出力してください。  
+   - コードは省略せず、すべての行を完全な内容で記載してください。
+
+以下に出力例のフォーマットを示します：
+
+---
+### 機能概要
+[ここにファイル「{file_path}」の機能概要の解説を記載]
+
+### コード全文
+```python
+[ここにファイル「{file_path}」の完全なコードを記載]
+
+以下、対象ファイルのコードです:
 {file_content}
 """
 )
 
 final_blog_prompt_template = PromptTemplate(
-    input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "target_audience", "blog_tone", "additional_requirements", "language", "github_url"],
+    input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "target_audience", "blog_tone", "additional_requirements", "language", "github_url", "project_files_content"],
     template="""
-あなたは有能なソフトウェアエンジニア兼テックライターです。以下の情報をもとに、詳細で具体的なテックブログ記事を{language}で作成してください。
+あなたは有能なソフトウェアエンジニア兼テックライターです。以下の情報をもとに、読み手がすぐに理解でき、具体的な実装意図が伝わる詳細なテックブログ記事を{language}で作成してください。
 
-【ディレクトリ構造】
-{directory_tree}
-
-【各ファイルの役割の要約】
-{file_roles}
-
-【各ファイルの詳細なコード解説】
-{detailed_code_analysis}
-
-【その他】
-- ブログのターゲット: {target_audience}
-- トーン（文体）: {blog_tone}
-- その他リクエスト: {additional_requirements}
-- GithubリポジトリのURL: {github_url}
-
-上記の情報をもとに、以下の構成で記事を出力してください。
-
-1. **イントロダクション**  
-   技術トレンド、背景、プロジェクトが解決しようとしている課題・ユースケース、及びGithubリポジトリの概要を紹介。
+【記事の構成】
+1. **イントロダクション（背景とユースケース）**  
+   - 現在の技術トレンドや背景、そして本プロジェクトが解決しようとしている課題・ユースケースについて具体的に記述してください。  
+   - GithubリポジトリのURLが提供されている場合は、そのリンクとともに、リポジトリ全体の概要や重要なポイントを詳述してください: {github_url}
 
 2. **機能詳細とチュートリアル**  
-   各ファイルの役割と、コードの動作、設計意図、エラーハンドリングの詳細を解説。
+   - 【ディレクトリ構造】  
+     {directory_tree}
+   - 【各ファイルの役割の要約】  
+     {file_roles}
+   - 【各ファイルの詳細なコード解説】  
+     {detailed_code_analysis}
+   - 上記に加え、各主要ファイル（例：app.py、index.html、README.md など）の目的、役割、主要な処理内容（例：Flaskアプリの初期化、環境変数のロード、フォームデータの処理、LLMチェーンの設定など）について、具体的かつ詳細に解説してください。  
+   - 各コードブロックは完全な内容を示し、エラーハンドリングや設計意図についても明確に説明すること。  
 
 3. **結論と今後の展望**  
-   プロジェクトの意義と実装内容の総括、及び今後の展望についてハッピーなトーンで締めくくる。
+   - プロジェクトの規模に応じた実装内容（500行以下なら主要なコード全文、大規模な場合は機能概要）の説明を行い、最後にハッピーなトーンで記事を締めくくってください。
 
-記事はMarkdown形式で記述し、各コードブロックは完全な内容を示すこと。
+【制約と注意点】
+- 記事はMarkdown形式で記述すること。見出し、箇条書き、コードブロックなどを適切に使用し、読みやすい文章構成を心がけること。  
+- 各コードブロックは完全な内容を示し、「省略」や「/省略なし/」などの不明瞭な表現は使用しないこと。  
+- また、各ファイルごとに、コードの具体的な動作、設計意図、エラーハンドリング、処理の流れを詳細に解説すること。  
+
+これらの情報、並びに以下の補助情報を踏まえて、上記構成と制約に従った詳細で具体的なテックブログ記事をMarkdown形式で出力してください。
 """
 )
 
