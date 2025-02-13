@@ -30,7 +30,6 @@
             <select name="language">
                 <option value="ja" selected>日本語</option>
                 <option value="en">English</option>
-                <!-- 必要に応じて他の言語も追加 -->
             </select>
         </label>
         <br><br>
@@ -57,23 +56,22 @@
     </div>
 
     <!-- AJAX ポーリング & 自動リダイレクト用 JavaScript -->
-    <script>
     {% if progress_id %}
+    <script>
       function fetchProgress() {
           fetch("/progress")
             .then(response => response.json())
             .then(data => {
                 document.getElementById("progress").innerText = data.progress;
-                // 進捗ログに「最終記事生成完了。」が含まれている場合、プレビュー画面へ自動遷移
-                if (data.progress.includes("最終記事生成完了。")) {
-                    window.location.href = "/preview_blog";
+                // 「一旦基本情報の抽出が完了しました」が含まれている場合、自動で概要プレビュー画面へ遷移
+                if (data.progress.includes("一旦基本情報の抽出が完了しました")) {
+                    window.location.href = "/generate_outline";
                 }
             })
             .catch(err => console.error(err));
       }
-      // 3秒ごとに進捗を取得
       setInterval(fetchProgress, 3000);
-    {% endif %}
     </script>
+    {% endif %}
 </body>
 </html>

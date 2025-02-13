@@ -56,22 +56,24 @@ result_store = {}
 
 def read_project_files(root_dir):
     """
-    指定ディレクトリ以下のファイル（.py, .md, .txt 等）を再帰的に読み込み、テキストを連結。
+    指定ディレクトリ以下のすべてのファイルを再帰的に読み込み、テキストを連結して返します。
+    ファイルの読み込み中にエラーが発生した場合は、そのファイルはスキップします。
     """
     logger.info("Reading project files from: %s", root_dir)
     all_text = []
     for dirpath, dirnames, filenames in os.walk(root_dir):
         for file in filenames:
             file_path = os.path.join(dirpath, file)
-            if file.lower().endswith((".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".js", ".ts", ".html", ".css", ".java", ".c", ".cpp")):
-                try:
-                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                        content = f.read()
-                    relative_path = os.path.relpath(file_path, root_dir)
-                    header = f"\n\n### File: {relative_path}\n"
-                    all_text.append(header + content)
-                except Exception as e:
-                    logger.warning("Could not read file %s: %s", file_path, e)
+            try:
+                # すべてのファイルを対象とする。読み込みエラーが発生した場合は例外処理でスキップ。
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                relative_path = os.path.relpath(file_path, root_dir)
+                header = f"\n\n### File: {relative_path}\n"
+                all_text.append(header + content)
+            except Exception as e:
+                logger.warning("Could not read file %s: %s", file_path, e)
+                continue
     combined_text = "\n".join(all_text)
     logger.info("Completed reading project files. Total length: %d characters", len(combined_text))
     return combined_text
