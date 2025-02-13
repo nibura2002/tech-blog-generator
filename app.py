@@ -57,21 +57,18 @@ result_store = {}
 def read_project_files(root_dir):
     """
     指定ディレクトリ以下のすべてのファイルを再帰的に読み込み、テキストを連結して返します。
-    ファイルの読み込み中にエラーが発生した場合は、そのファイルはスキップします。
+    読み込みエラーが発生した場合は、そのファイルはスキップします。
     以下の条件に合致するファイルは除外します：
       - ファイルサイズが20MBを超える
       - ファイルの文字数が20,000字を超える
       - 以下の拡張子のファイル（画像、動画、音声、圧縮、実行ファイル、フォント、Office文書等）
       - パスに "__pycache__" を含むファイル
     """
-    import os
-    
     logger.info("Reading project files from: %s", root_dir)
     all_text = []
     max_size = 20 * 1024 * 1024  # 20MB
     max_chars = 20000
 
-    # 除外する拡張子のリスト
     disallowed_extensions = (
         ".lock",
         # 画像
@@ -91,24 +88,15 @@ def read_project_files(root_dir):
     )
 
     for dirpath, dirnames, filenames in os.walk(root_dir):
-        # __pycache__を含むディレクトリは除外
         dirnames[:] = [d for d in dirnames if "__pycache__" not in d]
-
         for file in filenames:
-            # ファイルパスの作成
             file_path = os.path.join(dirpath, file)
-            
-            # 除外対象の拡張子チェック
             if file.lower().endswith(disallowed_extensions):
                 logger.info("Skipping disallowed file: %s", file_path)
                 continue
-
-            # __pycache__ を含むパスは除外
             if "__pycache__" in file_path:
                 logger.info("Skipping __pycache__ file: %s", file_path)
                 continue
-
-            # ファイルサイズチェック
             try:
                 size = os.path.getsize(file_path)
                 if size > max_size:
@@ -121,11 +109,9 @@ def read_project_files(root_dir):
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
-                # 文字数チェック
                 if len(content) > max_chars:
                     logger.info("Skipping file due to excessive length (>20000 chars): %s (length=%d)", file_path, len(content))
                     continue
-
                 relative_path = os.path.relpath(file_path, root_dir)
                 header = f"\n\n### File: {relative_path}\n"
                 all_text.append(header + content)
@@ -184,7 +170,6 @@ code_detail_prompt_template = PromptTemplate(
 """
 )
 
-# ブログアウトライン生成用プロンプト
 blog_outline_prompt_template = PromptTemplate(
     input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "project_files_content", "github_url", "target_audience", "blog_tone", "additional_requirements"],
     template="""
@@ -192,16 +177,17 @@ blog_outline_prompt_template = PromptTemplate(
 以下のコンテキスト情報を基に、テックブログの章立て（アウトライン）を考案してください。
 
 【コンテキスト】
-1) ディレクトリ構造:
+1) **ディレクトリ構造**:
 {directory_tree}
 
-2) ファイルの役割概要:
+2) **ファイルの役割概要**:
 {file_roles}
 
-3) 詳細なコード解説（各機能と対応するコードブロックのペアを、コードの流れに沿ってまとめる）:
+3) **詳細なコード解説**  
+   (各機能と対応するコードブロックのペアを、コードの流れに沿ってまとめる):
 {detailed_code_analysis}
 
-4) 全ファイル内容（参考用）:
+4) **全ファイル内容** (参考用):
 {project_files_content}
 
 【追加情報】
@@ -211,8 +197,9 @@ blog_outline_prompt_template = PromptTemplate(
 - その他リクエスト: {additional_requirements}
 
 【出力要件】
-- ブログ全体をどのような章構成（見出し）にするか、各章でどのコードブロック（ファイル名）を取り上げるかを箇条書き形式で示してください。
-- Markdown形式で、章とその中で扱う話題・コードブロックのリストを出力してください。
+- ブログ全体の章立てを、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた形式で箇条書きしてください。
+- 各章・節には、取り上げる話題および対応するコードブロック（対象ファイル名）のリストを示してください。
+- Markdown形式で出力してください。
 """
 )
 
@@ -227,16 +214,16 @@ final_blog_prompt_template = PromptTemplate(
 {blog_outline}
 
 【その他のコンテキスト】
-1) ディレクトリ構造:
+1) **ディレクトリ構造**:
 {directory_tree}
 
-2) ファイルの役割概要:
+2) **ファイルの役割概要**:
 {file_roles}
 
-3) 詳細なコード解説:
+3) **詳細なコード解説**:
 {detailed_code_analysis}
 
-4) 全ファイル内容:
+4) **全ファイル内容**:
 {project_files_content}
 
 【追加情報】
@@ -247,7 +234,7 @@ final_blog_prompt_template = PromptTemplate(
 
 【出力要件】
 - アウトラインに沿って、読みやすいMarkdown形式の記事を作成してください。
-- 各章には、取り上げる話題と対応するコードブロック（ファイル名）のリストが含まれていること。
+- 記事は、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた構成で、各章には取り上げる話題と対応するコードブロック（ファイル名）のリストが含まれていること。
 - コードブロックは省略せず、完全な内容を示してください。
 - 最後はハッピーなトーンで記事を締めくくってください。
 """
@@ -299,7 +286,6 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
         all_files = []
         for dirpath, dirnames, filenames in os.walk(temp_project_dir):
             for file in filenames:
-                # すべてのファイルを対象とする。読み込みに失敗したらスキップ
                 all_files.append(os.path.join(dirpath, file))
         total_files = len(all_files)
         progress_store[progress_id] += f"対象ファイル数: {total_files} 件\n"
@@ -355,7 +341,6 @@ def generate_outline():
     detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
     project_files_content = result_store.get(progress_id + "_files", "")
 
-    # フロントエンドからのパラメータはオプションとして取得
     github_url = request.args.get("github_url", "")
     target_audience = request.args.get("target_audience", "エンジニア全般")
     blog_tone = request.args.get("blog_tone", "カジュアルだけど専門性を感じるトーン")
