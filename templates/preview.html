@@ -45,17 +45,25 @@
 
         <!-- メインコンテンツ -->
         <main class="main-content">
-            <h1>ブログ確認</h1>
-            <form id="blogForm" method="POST">
-                <textarea name="edited_markdown" rows="25" cols="100">{{ blog_markdown|e }}</textarea>
-                <br><br>
-                <button type="button" onclick="submitBlog()">プレビューを更新</button>
-            </form>
-            <hr>
-            <h2>プレビュー (Markdown → HTML)</h2>
-            <div id="preview-container">{{ converted_html|safe }}</div>
-            <br>
-            <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
+            {% if blog_markdown %}
+                <h1>ブログ確認</h1>
+                <form id="blogForm" method="POST">
+                    <textarea name="edited_markdown" rows="25" cols="100">{{ blog_markdown|e }}</textarea>
+                    <br><br>
+                    <button type="button" onclick="submitBlog()">プレビューを更新</button>
+                </form>
+                <hr>
+                <h2>プレビュー (Markdown → HTML)</h2>
+                <div id="preview-container">{{ converted_html|safe }}</div>
+                <br>
+                <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
+            {% else %}
+                <!-- 最終ブログ生成中の場合の表示 -->
+                <div id="processingMessage">
+                    <h1>ブログ生成中...</h1>
+                    <p>現在、最終テックブログの生成処理が進行中です。しばらくお待ちください。</p>
+                </div>
+            {% endif %}
         </main>
 
         <!-- フッターにページ遷移用のリンクを追加 -->
@@ -64,8 +72,8 @@
             <a href="{{ url_for('preview_outline') }}">アウトライン確認</a> |
             <a href="{{ url_for('preview_blog') }}">ブログ確認</a>
         </footer>        
-
     </div>
+    <!-- main.js を読み込む -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

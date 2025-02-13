@@ -384,11 +384,38 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
         progress_store[progress_id] += f"処理中にエラー発生: {e}\n"
 
 ###############################################################################
+# バックグラウンド処理関数（最終ブログ生成）
+###############################################################################
+def process_final_blog(progress_id, params):
+    try:
+        progress_store[progress_id] += "Step X: 最終テックブログ生成処理を開始します。\n"
+        llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
+        final_chain = LLMChain(llm=llm, prompt=final_blog_prompt_template)
+        generated_blog = final_chain.run({
+            "directory_tree": result_store.get(progress_id + "_tree", ""),
+            "file_roles": result_store.get(progress_id + "_roles", ""),
+            "detailed_code_analysis": result_store.get(progress_id + "_analysis", ""),
+            "project_files_content": result_store.get(progress_id + "_files", ""),
+            "github_url": params["github_url"],
+            "target_audience": params["target_audience"],
+            "blog_tone": params["blog_tone"],
+            "additional_requirements": params["additional_requirements"],
+            "language": params["language"],
+            "blog_outline": result_store.get(progress_id + "_outline", "")
+        })
+        result_store[progress_id] = generated_blog
+        progress_store[progress_id] += "最終テックブログの生成が完了しました。\n"
+    except Exception as e:
+        progress_store[progress_id] += f"最終テックブログ生成中にエラーが発生しました: {e}\n"
+
+
+###############################################################################
 # アウトライン生成
 ###############################################################################
 @app.route("/generate_outline", methods=["GET"])
 def generate_outline():
     progress_id = session.get("progress_id", None)
+
     if not progress_id:
         flash("progress_idがありません。", "error")
         return redirect(url_for("index"))
@@ -448,34 +475,22 @@ def generate_final_blog():
     if not progress_id:
         flash("progress_idがありません。", "error")
         return redirect(url_for("index"))
+    
+    if request.method == "POST":
+        params = get_common_params_from_args()
+        # バックグラウンドで最終ブログ生成処理を開始
+        if "最終テックブログの生成が開始しました" not in progress_store[progress_id]:
+            progress_store[progress_id] += "最終テックブログの生成が開始しました。\n"
+            threading.Thread(
+                target=process_final_blog,
+                args=(progress_id, params),
+                daemon=True
+            ).start()
+        # 即時に処理開始レスポンスを返す
+        return jsonify({"status": "最終テックブログ生成開始"}), 200
 
-    directory_tree = result_store.get(progress_id + "_tree", "")
-    file_roles = result_store.get(progress_id + "_roles", "")
-    detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
-    project_files_content = result_store.get(progress_id + "_files", "")
-    blog_outline = result_store.get(progress_id + "_outline", "")
-    params = get_common_params_from_args()
-    try:
-        llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
-        final_chain = LLMChain(llm=llm, prompt=final_blog_prompt_template)
-        generated_blog = final_chain.run({
-            "directory_tree": directory_tree,
-            "file_roles": file_roles,
-            "detailed_code_analysis": detailed_code_analysis,
-            "project_files_content": project_files_content,
-            "github_url": params["github_url"],
-            "target_audience": params["target_audience"],
-            "blog_tone": params["blog_tone"],
-            "additional_requirements": params["additional_requirements"],
-            "language": params["language"],
-            "blog_outline": blog_outline
-        })
-        result_store[progress_id] = generated_blog
-        flash("最終テックブログを生成しました。", "info")
-        return redirect(url_for("preview_blog"))
-    except Exception as e:
-        flash(f"ブログ生成中にエラーが発生しました: {e}", "error")
-        return redirect(url_for("index"))
+    # GETの場合はシンプルな案内ページを表示（必要に応じて実装）
+    return render_template("generate_final_blog.html")
 
 ###############################################################################
 # メインフロー: index → process_project → ...

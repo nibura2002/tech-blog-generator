@@ -100,3 +100,37 @@ function submitBlog() {
   })
   .catch(error => console.error("ブログ送信エラー:", error));
 }
+
+// 最終ブログ生成の進捗ポーリング（preview_blog 用）
+function startFinalBlogPolling() {
+    const processingMessage = document.getElementById("processingMessage");
+    if (!processingMessage) return;
+    
+    const finalPollingInterval = setInterval(() => {
+        fetch("/progress")
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("進捗情報がまだ存在しません");
+                }
+                return response.json();
+            })
+            .then(data => {
+                processingMessage.innerHTML = 
+                    "<h1>ブログ生成中...</h1>" +
+                    "<p>現在、最終テックブログの生成処理が進行中です。しばらくお待ちください。</p>";
+                // 最終ブログ生成完了のメッセージを確認して自動リロード
+                if (data.progress.includes("最終テックブログの生成が完了しました")) {
+                    clearInterval(finalPollingInterval);
+                    window.location.reload();
+                }
+            })
+            .catch(err => console.error("進捗情報の取得に失敗:", err));
+    }, 3000);
+}
+
+// preview_blog ページの場合、processingMessage 要素があればポーリング開始
+document.addEventListener("DOMContentLoaded", function () {
+    if (document.getElementById("processingMessage")) {
+        startFinalBlogPolling();
+    }
+});
