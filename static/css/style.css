@@ -1,5 +1,3 @@
-/* style.css */
-
 /* 全体の背景とフォント設定 */
 body {
     font-family: 'Noto Sans', sans-serif;
@@ -7,61 +5,61 @@ body {
     margin: 0;
     padding: 0;
     color: #333;
-  }
-  
-  /* ヘッダー */
-  h1 {
+}
+
+/* ヘッダー */
+h1 {
     background-color: #343a40;
     color: #fff;
     padding: 1rem;
     text-align: center;
     margin: 0;
-  }
-  
-  /* フォームエリア */
-  form {
+}
+
+/* フォームエリア */
+form {
     max-width: 800px;
     margin: 2rem auto;
     padding: 1rem;
     background-color: #fff;
     border: 1px solid #dee2e6;
     border-radius: 0.25rem;
-  }
-  
-  /* ラベルと入力エリア */
-  label {
+}
+
+/* ラベルと入力エリア */
+label {
     display: block;
     margin-bottom: 0.5rem;
     font-weight: bold;
-  }
-  
-  input[type="text"],
-  input[type="url"],
-  select,
-  textarea {
+}
+
+input[type="text"],
+input[type="url"],
+select,
+textarea {
     width: 100%;
     padding: 0.5rem;
     margin-bottom: 1rem;
     border: 1px solid #ced4da;
     border-radius: 0.25rem;
-  }
-  
-  /* ボタン */
-  button {
+}
+
+/* ボタン */
+button {
     background-color: #007bff;
     color: #fff;
     border: none;
     padding: 0.75rem 1.5rem;
     border-radius: 0.25rem;
     cursor: pointer;
-  }
-  
-  button:hover {
+}
+
+button:hover {
     background-color: #0056b3;
-  }
-  
-  /* 進捗表示エリア */
-  #progress {
+}
+
+/* 進捗表示エリア */
+#progress {
     max-width: 800px;
     margin: 1rem auto;
     padding: 1rem;
@@ -69,33 +67,90 @@ body {
     background-color: #e9ecef;
     border-radius: 0.25rem;
     white-space: pre-wrap;
-  }
-  
-  /* フラッシュメッセージ */
-  ul.flashes {
+}
+
+/* フラッシュメッセージ */
+ul.flashes {
     list-style: none;
     padding: 0;
     max-width: 800px;
     margin: 1rem auto;
-  }
-  
-  ul.flashes li {
+}
+
+ul.flashes li {
     padding: 0.5rem 1rem;
     margin-bottom: 0.5rem;
     border-radius: 0.25rem;
-  }
-  
-  ul.flashes li.error {
+}
+
+ul.flashes li.error {
     background-color: #f8d7da;
     color: #721c24;
-  }
-  
-  ul.flashes li.info {
+}
+
+ul.flashes li.info {
     background-color: #d1ecf1;
     color: #0c5460;
-  }
-  
-  ul.flashes li.warning {
+}
+
+ul.flashes li.warning {
     background-color: #fff3cd;
     color: #856404;
-  }
+}
+
+/* Markdown プレビュー用スタイル */
+#preview-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 1rem;
+    border: 1px solid #ced4da;
+    background-color: #fff;
+    border-radius: 0.25rem;
+}
+
+/* Markdown 内の見出し */
+#preview-container h1 {
+    font-size: 1.8rem;
+    margin-top: 1.5rem;
+    color: #343a40;
+}
+
+#preview-container h2 {
+    font-size: 1.5rem;
+    margin-top: 1.2rem;
+    color: #495057;
+}
+
+#preview-container h3 {
+    font-size: 1.2rem;
+    margin-top: 1rem;
+    color: #6c757d;
+}
+
+/* Markdown のリストスタイル */
+#preview-container ul, #preview-container ol {
+    padding-left: 1.5rem;
+}
+
+/* Pygments Code Highlighting */
+.codehilite {
+    background: #f8f8f8;
+    border: 1px solid #ccc;
+    padding: 0.5em;
+    overflow: auto;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.codehilite pre {
+    background: none; /* デフォルトの背景色を削除 */
+    border: none;
+    padding: 0;
+    overflow: auto;
+}
+
+/* コードブロック全体 */
+.codehilite code {
+    font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+    font-size: 0.9em;
+}

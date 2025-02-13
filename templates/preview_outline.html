@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>Blog Outline Preview</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <h1>Blog Outline Preview</h1>
@@ -12,5 +13,9 @@
         <br><br>
         <button type="submit">このアウトラインで最終ブログを生成</button>
     </form>
+
+    <!-- 外部JavaScriptファイルの読み込み -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>    
+
 </body>
 </html>

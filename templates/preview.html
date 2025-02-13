@@ -2,25 +2,31 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Tech Blog Preview</title>
+    <title>Blog Preview</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pygments.css') }}">
 </head>
 <body>
-    <h1>Tech Blog Preview</h1>
+    <h1>Blog Preview</h1>
+
+    <!-- Markdown エディター（必要に応じて編集可能） -->
     <form method="POST">
         <textarea name="edited_markdown" rows="25" cols="100">{{ blog_markdown|e }}</textarea><br><br>
         <button type="submit">プレビューを更新</button>
     </form>
+    
     <hr>
-    <h2>プレビュー</h2>
-    <div style="border: 1px solid #ccc; padding: 1em;">
+    <h2>プレビュー (Markdown → HTML)</h2>
+    <div id="preview-container">
         {{ converted_html|safe }}
     </div>
+    
     <br>
     <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
     <br><br>
-    <h3>進捗ログ</h3>
-    <pre>{{ progress_log }}</pre>
-    <br>
     <a href="{{ url_for('index') }}">最初の画面へ戻る</a>
+    
+    <!-- 外部JavaScriptファイルの読み込み -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

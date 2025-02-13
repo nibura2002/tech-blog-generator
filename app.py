@@ -564,7 +564,8 @@ def preview_blog():
 
     progress_id = session.get("progress_id", None)
     blog_markdown = result_store.get(progress_id, "")
-    converted_html = markdown.markdown(blog_markdown)
+    # Markdown の HTML 変換に fenced_code, codehilite 拡張を追加
+    converted_html = markdown.markdown(blog_markdown, extensions=['fenced_code', 'codehilite'])
     progress_log = progress_store.get(progress_id, "進捗情報はありません。")
     return render_template("preview.html",
                            blog_markdown=blog_markdown,
