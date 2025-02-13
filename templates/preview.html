@@ -11,13 +11,16 @@
         <button type="submit">プレビューを更新</button>
     </form>
     <hr>
-    <h2>プレビュー (MarkdownをHTMLに変換した結果)</h2>
+    <h2>プレビュー</h2>
     <div style="border: 1px solid #ccc; padding: 1em;">
         {{ converted_html|safe }}
     </div>
     <br>
     <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
     <br><br>
+    <h3>進捗ログ</h3>
+    <pre>{{ progress_log }}</pre>
+    <br>
     <a href="{{ url_for('index') }}">最初の画面へ戻る</a>
 </body>
 </html>

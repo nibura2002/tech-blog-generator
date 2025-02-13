@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Blog Outline Preview</title>
+</head>
+<body>
+    <h1>Blog Outline Preview</h1>
+    <p>下記のアウトラインを必要に応じて編集し、「このアウトラインで最終ブログを生成」ボタンを押してください。</p>
+    <form method="POST">
+        <textarea name="edited_outline" rows="20" cols="100">{{ blog_outline|e }}</textarea>
+        <br><br>
+        <button type="submit">このアウトラインで最終ブログを生成</button>
+    </form>
+</body>
+</html>
