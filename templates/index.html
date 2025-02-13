@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <title>Tech Blog Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <h1>Tech Blog Generator</h1>
@@ -55,23 +56,7 @@
         進捗情報をここに表示します…
     </div>
 
-    <!-- AJAX ポーリング & 自動リダイレクト用 JavaScript -->
-    {% if progress_id %}
-    <script>
-      function fetchProgress() {
-          fetch("/progress")
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById("progress").innerText = data.progress;
-                // 「一旦基本情報の抽出が完了しました」が含まれている場合、自動で概要プレビュー画面へ遷移
-                if (data.progress.includes("一旦基本情報の抽出が完了しました")) {
-                    window.location.href = "/generate_outline";
-                }
-            })
-            .catch(err => console.error(err));
-      }
-      setInterval(fetchProgress, 3000);
-    </script>
-    {% endif %}
+    <!-- 外部JavaScriptファイルの読み込み -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
