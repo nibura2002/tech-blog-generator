@@ -57,7 +57,7 @@ result_store = {}
 def read_project_files(root_dir):
     """
     指定ディレクトリ以下のすべてのファイルを再帰的に読み込み、テキストを連結して返します。
-    ファイルの読み込み中にエラーが発生した場合は、そのファイルはスキップします。
+    読み込みエラーが発生した場合は、そのファイルはスキップします。
     """
     logger.info("Reading project files from: %s", root_dir)
     all_text = []
@@ -65,7 +65,6 @@ def read_project_files(root_dir):
         for file in filenames:
             file_path = os.path.join(dirpath, file)
             try:
-                # すべてのファイルを対象とする。読み込みエラーが発生した場合は例外処理でスキップ。
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
                 relative_path = os.path.relpath(file_path, root_dir)
@@ -80,8 +79,7 @@ def read_project_files(root_dir):
 
 def get_directory_tree(root_dir):
     """
-    ディレクトリ構造をツリー形式の文字列として返す
-    （例：├── project/, │   ├── app.py など）
+    ディレクトリ構造をツリー記号（├──, │   など）を使って表現し、文字列として返します。
     """
     tree_lines = []
     for dirpath, dirnames, filenames in os.walk(root_dir):
@@ -94,7 +92,7 @@ def get_directory_tree(root_dir):
 
 def strip_code_fences(text: str) -> str:
     """
-    Markdownコードフェンス ```...``` を除去
+    Markdownコードフェンス ```...``` を除去します。
     """
     text = re.sub(r"```[a-zA-Z]*\n", "", text)
     text = text.replace("```", "")
@@ -126,11 +124,12 @@ code_detail_prompt_template = PromptTemplate(
 """
 )
 
+# ブログアウトライン生成用プロンプト
 blog_outline_prompt_template = PromptTemplate(
     input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "project_files_content", "github_url", "target_audience", "blog_tone", "additional_requirements"],
     template="""
 あなたは有能なソフトウェアエンジニア兼テックライターです。
-以下の情報をもとに、テックブログの章立て（アウトライン）を考案してください。
+以下のコンテキスト情報を基に、テックブログの章立て（アウトライン）を考案してください。
 
 【コンテキスト】
 1) ディレクトリ構造:
@@ -139,10 +138,10 @@ blog_outline_prompt_template = PromptTemplate(
 2) ファイルの役割概要:
 {file_roles}
 
-3) 詳細なコード解説:
+3) 詳細なコード解説（各機能と対応するコードブロックのペアを、コードの流れに沿ってまとめる）:
 {detailed_code_analysis}
 
-4) 全ファイル内容:
+4) 全ファイル内容（参考用）:
 {project_files_content}
 
 【追加情報】
@@ -152,9 +151,8 @@ blog_outline_prompt_template = PromptTemplate(
 - その他リクエスト: {additional_requirements}
 
 【出力要件】
-- ブログ全体をどのような章構成（見出し）にするか、
-  各章でどんな話題を扱うかを箇条書きなどで示してください。
-- Markdown形式で書いてください。
+- ブログ全体をどのような章構成（見出し）にするか、各章でどのコードブロック（ファイル名）を取り上げるかを箇条書き形式で示してください。
+- Markdown形式で、章とその中で扱う話題・コードブロックのリストを出力してください。
 """
 )
 
@@ -163,7 +161,7 @@ final_blog_prompt_template = PromptTemplate(
     template="""
 あなたは有能なソフトウェアエンジニア兼テックライターです。
 
-以下の情報を踏まえて、最終的なテックブログ記事を{language}で作成してください。
+以下の情報とアウトラインを基に、最終的なテックブログ記事を{language}で作成してください。
 
 【事前に確定したアウトライン】
 {blog_outline}
@@ -188,25 +186,25 @@ final_blog_prompt_template = PromptTemplate(
 - その他リクエスト: {additional_requirements}
 
 【出力要件】
-- アウトラインを基に、読みやすいMarkdown形式の記事を作成してください。
-- コードブロックは省略せず示し、各機能とコードを対応づけて解説してください。
-- 最後はハッピーなトーンで締めくくってください。
+- アウトラインに沿って、読みやすいMarkdown形式の記事を作成してください。
+- 各章には、取り上げる話題と対応するコードブロック（ファイル名）のリストが含まれていること。
+- コードブロックは省略せず、完全な内容を示してください。
+- 最後はハッピーなトーンで記事を締めくくってください。
 """
 )
 
 ###############################################################################
-# バックグラウンド処理：アウトライン生成前まで
+# バックグラウンド処理関数
 ###############################################################################
 
 def process_project(progress_id, github_url, target_audience, blog_tone, additional_requirements, language, temp_project_dir):
     """
     バックグラウンドで:
     1. プロジェクトファイル取得
-    2. ディレクトリ構造
-    3. ファイル要約
-    4. 詳細解説
-    5. ここでは アウトライン生成までは行わず、結果を格納して終了
-       （続きは /generate_outline で行う）
+    2. ディレクトリ構造の取得
+    3. ファイルの役割要約
+    4. 詳細なコード解説
+    5. 取得した情報を保存（アウトライン生成は別ルートへ）
     """
     try:
         progress_store[progress_id] = "Step 1: プロジェクトファイルの取得を開始します。\n"
@@ -218,33 +216,39 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
             try:
                 subprocess.check_output(clone_cmd, stderr=subprocess.STDOUT)
                 progress_store[progress_id] += "GitHubリポジトリからのクローンに成功。\n"
+                logger.info("Project files obtained from GitHub clone.")
             except subprocess.CalledProcessError as e:
                 progress_store[progress_id] += "GitHubリポジトリのクローンに失敗しました。\n"
+                logger.error("GitHub clone failed: %s", e.output.decode("utf-8"))
                 return
 
         progress_store[progress_id] += "Step 2: ディレクトリ構造を取得中...\n"
         directory_tree = get_directory_tree(temp_project_dir)
         progress_store[progress_id] += "ディレクトリ構造の取得完了。\n"
+        logger.info("Directory tree obtained.")
 
         progress_store[progress_id] += "Step 3: 各ファイルの役割を要約中...\n"
         llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
         file_role_chain = LLMChain(llm=llm, prompt=file_role_prompt_template)
         file_roles = file_role_chain.run({"directory_tree": directory_tree})
         progress_store[progress_id] += "各ファイルの役割要約完了。\n"
+        logger.info("File roles summary obtained.")
 
         progress_store[progress_id] += "Step 4: 各ファイルの詳細なコード解説を取得中...\n"
         detailed_code_analysis = ""
         all_files = []
         for dirpath, dirnames, filenames in os.walk(temp_project_dir):
             for file in filenames:
-                if file.lower().endswith((".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".js", ".ts", ".html", ".css", ".java", ".c", ".cpp")):
-                    all_files.append(os.path.join(dirpath, file))
+                # すべてのファイルを対象とする。読み込みに失敗したらスキップ
+                all_files.append(os.path.join(dirpath, file))
         total_files = len(all_files)
         progress_store[progress_id] += f"対象ファイル数: {total_files} 件\n"
+        logger.info("Total files to analyze: %d", total_files)
 
         for i, file_path in enumerate(all_files, 1):
             relative_file_path = os.path.relpath(file_path, temp_project_dir)
             progress_store[progress_id] += f"ファイル解析中: {i}/{total_files} -> {relative_file_path}\n"
+            logger.info("Processing file %d/%d: %s", i, total_files, relative_file_path)
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     file_content = f.read()
@@ -256,11 +260,10 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
                 detailed_code_analysis += f"\n\n## {relative_file_path}\n" + file_detail
             except Exception as e:
                 progress_store[progress_id] += f"ファイル解析失敗: {relative_file_path} - {e}\n"
-
+                logger.warning("Failed to analyze file %s: %s", file_path, e)
         progress_store[progress_id] += "各ファイルの詳細なコード解説完了。\n"
         project_files_content = read_project_files(temp_project_dir)
 
-        # ここではまだアウトライン生成をせず、次のステップで行う
         progress_store[progress_id] += "一旦基本情報の抽出が完了しました。\n"
         
         # 取得情報を result_store に保存
@@ -271,6 +274,7 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
 
     except Exception as e:
         progress_store[progress_id] += f"処理中にエラー発生: {e}\n"
+        logger.error("Error in processing: %s", e)
 
 ###############################################################################
 # アウトライン生成
@@ -278,8 +282,8 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
 @app.route("/generate_outline", methods=["GET"])
 def generate_outline():
     """
-    process_projectの後、ユーザが「アウトライン生成」ボタンを押すなどで呼ばれ、
-    ブログの章立てを生成する。
+    process_project の後に呼ばれ、ブログの章立て（アウトライン）を生成します。
+    各章で取り上げるコードブロック（ファイル名）のリストも出力してください。
     """
     progress_id = session.get("progress_id", None)
     if not progress_id:
@@ -291,13 +295,12 @@ def generate_outline():
     detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
     project_files_content = result_store.get(progress_id + "_files", "")
 
-    # パラメータを取得（フロントで指定された場合に備えて）
+    # フロントエンドからのパラメータはオプションとして取得
     github_url = request.args.get("github_url", "")
     target_audience = request.args.get("target_audience", "エンジニア全般")
     blog_tone = request.args.get("blog_tone", "カジュアルだけど専門性を感じるトーン")
     additional_requirements = request.args.get("additional_requirements", "")
 
-    # LLM呼び出し
     try:
         llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
         outline_chain = LLMChain(llm=llm, prompt=blog_outline_prompt_template)
@@ -311,12 +314,10 @@ def generate_outline():
             "blog_tone": blog_tone,
             "additional_requirements": additional_requirements
         })
-        # 結果を保存
         result_store[progress_id + "_outline"] = blog_outline
         progress_store[progress_id] += "\nブログアウトラインの生成が完了しました。\n"
         flash("ブログアウトラインを生成しました。", "info")
         return redirect(url_for("preview_outline"))
-
     except Exception as e:
         flash(f"アウトライン生成中にエラーが発生しました: {e}", "error")
         return redirect(url_for("index"))
@@ -332,14 +333,11 @@ def preview_outline():
         return redirect(url_for("index"))
 
     outline_key = progress_id + "_outline"
-
     if request.method == "POST":
-        # ユーザが修正したアウトラインを保存し、次へ
         edited_outline = request.form.get("edited_outline", "")
         result_store[outline_key] = edited_outline
         return redirect(url_for("generate_final_blog"))
 
-    # 現在のアウトラインを取得
     blog_outline = result_store.get(outline_key, "まだアウトラインが生成されていません。")
     return render_template("preview_outline.html", blog_outline=blog_outline)
 
@@ -353,21 +351,18 @@ def generate_final_blog():
         flash("progress_idがありません。", "error")
         return redirect(url_for("index"))
 
-    # 前段階で保存していた各種情報
     directory_tree = result_store.get(progress_id + "_tree", "")
     file_roles = result_store.get(progress_id + "_roles", "")
     detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
     project_files_content = result_store.get(progress_id + "_files", "")
     blog_outline = result_store.get(progress_id + "_outline", "")
 
-    # ユーザ指定の設定(本来はセッション等に保存しておく想定)
     github_url = request.args.get("github_url", "")
     target_audience = request.args.get("target_audience", "エンジニア全般")
     blog_tone = request.args.get("blog_tone", "カジュアルだけど専門性を感じるトーン")
     additional_requirements = request.args.get("additional_requirements", "")
     language = request.args.get("language", "ja")
 
-    # LLM呼び出し
     try:
         llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
         final_chain = LLMChain(llm=llm, prompt=final_blog_prompt_template)
@@ -386,7 +381,6 @@ def generate_final_blog():
         result_store[progress_id] = generated_blog
         flash("最終テックブログを生成しました。", "info")
         return redirect(url_for("preview_blog"))
-
     except Exception as e:
         flash(f"ブログ生成中にエラーが発生しました: {e}", "error")
         return redirect(url_for("index"))
@@ -397,7 +391,6 @@ def generate_final_blog():
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        # 進捗管理用IDの生成
         progress_id = str(uuid.uuid4())
         session["progress_id"] = progress_id
         progress_store[progress_id] = ""
@@ -414,7 +407,6 @@ def index():
         additional_requirements = request.form.get("additional_requirements", "").strip()
         language = request.form.get("language", "ja")
 
-        # 一時ディレクトリにアップロードファイルを保存
         temp_project_dir = tempfile.mkdtemp()
         if uploaded_files and len(uploaded_files) > 0:
             for file in uploaded_files:
@@ -425,7 +417,6 @@ def index():
                 os.makedirs(os.path.dirname(dest_path), exist_ok=True)
                 file.save(dest_path)
 
-        # バックグラウンドで process_project 開始
         threading.Thread(
             target=process_project,
             args=(progress_id, github_url, target_audience, blog_tone, additional_requirements, language, temp_project_dir),
@@ -439,7 +430,6 @@ def index():
 
 @app.route("/progress", methods=["GET"])
 def progress():
-    """進捗状況を返すエンドポイント。index.htmlがポーリングして使用する。"""
     progress_id = session.get("progress_id", None)
     if progress_id and progress_id in progress_store:
         return jsonify({"progress": progress_store[progress_id]})
@@ -447,9 +437,6 @@ def progress():
 
 @app.route("/preview_blog", methods=["GET", "POST"])
 def preview_blog():
-    """
-    最終ブログ記事のプレビュー画面
-    """
     if request.method == "POST":
         edited_markdown = request.form.get("edited_markdown", "")
         result_store[session.get("progress_id")] = edited_markdown
@@ -459,7 +446,6 @@ def preview_blog():
     blog_markdown = result_store.get(progress_id, "")
     converted_html = markdown.markdown(blog_markdown)
     progress_log = progress_store.get(progress_id, "進捗情報はありません。")
-
     return render_template("preview.html",
                            blog_markdown=blog_markdown,
                            converted_html=converted_html,
@@ -467,9 +453,6 @@ def preview_blog():
 
 @app.route("/download_markdown", methods=["GET"])
 def download_markdown():
-    """
-    最終的なMarkdownをダウンロード
-    """
     progress_id = session.get("progress_id", None)
     blog_markdown = result_store.get(progress_id, "")
     if not blog_markdown:
@@ -479,7 +462,6 @@ def download_markdown():
         tmp_file.write(blog_markdown.encode("utf-8"))
         tmp_file_name = tmp_file.name
     return send_file(tmp_file_name, as_attachment=True, download_name="tech_blog.md", mimetype="text/markdown")
-
 
 ###############################################################################
 # Run the Flask App
