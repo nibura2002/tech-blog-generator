@@ -469,7 +469,7 @@ def index():
         params = get_common_params_from_form()
         progress_id = str(uuid.uuid4())
         session["progress_id"] = progress_id
-        progress_store[progress_id] = ""
+        progress_store[progress_id] = "処理を開始します...\n"
 
         github_url = params["github_url"]
         uploaded_files = request.files.getlist("project_folder")
@@ -505,10 +505,18 @@ def index():
 
 @app.route("/progress", methods=["GET"])
 def progress():
+    """
+    現在の進捗状況を返すエンドポイント
+    """
     progress_id = session.get("progress_id", None)
-    if progress_id and progress_id in progress_store:
-        return jsonify({"progress": progress_store[progress_id]})
-    return jsonify({"progress": "進捗情報がありません。"}), 404
+    
+    if not progress_id:
+        return jsonify({"progress": "進捗情報がありません。"}), 404
+
+    # progress_store に progress_id がない場合も 404 を返さず、適切な初期値を返す
+    progress_info = progress_store.get(progress_id, "処理が開始されていません。")
+    
+    return jsonify({"progress": progress_info})
 
 @app.route("/preview_blog", methods=["GET", "POST"])
 def preview_blog():
