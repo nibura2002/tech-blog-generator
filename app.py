@@ -54,9 +54,6 @@ result_store = {}
 # Helper Functions for Parameter Retrieval
 ###############################################################################
 def get_common_params_from_form():
-    """
-    POSTリクエストから共通パラメータを取得する
-    """
     return {
         "github_url": request.form.get("github_url", "").strip(),
         "target_audience": request.form.get("target_audience", "エンジニア全般").strip(),
@@ -66,9 +63,6 @@ def get_common_params_from_form():
     }
 
 def get_common_params_from_args():
-    """
-    GETリクエストのクエリパラメータから共通パラメータを取得する
-    """
     return {
         "github_url": request.args.get("github_url", ""),
         "target_audience": request.args.get("target_audience", "エンジニア全般"),
@@ -81,20 +75,10 @@ def get_common_params_from_args():
 # Utility functions
 ###############################################################################
 def read_project_files(root_dir):
-    """
-    指定ディレクトリ以下のすべてのファイルを再帰的に読み込み、テキストを連結して返します。
-    読み込みエラーが発生した場合は、そのファイルはスキップします。
-    以下の条件に合致するファイルは除外します：
-      - ファイルサイズが20MBを超える
-      - ファイルの文字数が20,000字を超える
-      - 以下の拡張子のファイル（画像、動画、音声、圧縮、実行ファイル、フォント、Office文書等）
-      - パスに "__pycache__" を含むファイル
-    """
     logger.info("Reading project files from: %s", root_dir)
     all_text = []
     max_size = 20 * 1024 * 1024  # 20MB
     max_chars = 20000
-
     disallowed_extensions = (
         ".lock",
         ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".tiff", ".ico",
@@ -105,7 +89,6 @@ def read_project_files(root_dir):
         ".ttf", ".otf", ".woff", ".woff2",
         ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"
     )
-
     for dirpath, dirnames, filenames in os.walk(root_dir):
         dirnames[:] = [d for d in dirnames if "__pycache__" not in d]
         for file in filenames:
@@ -124,7 +107,6 @@ def read_project_files(root_dir):
             except Exception as e:
                 logger.warning("Could not determine file size for %s: %s", file_path, e)
                 continue
-
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
@@ -137,15 +119,11 @@ def read_project_files(root_dir):
             except Exception as e:
                 logger.warning("Could not read file %s: %s", file_path, e)
                 continue
-
     combined_text = "\n".join(all_text)
     logger.info("Completed reading project files. Total length: %d characters", len(combined_text))
     return combined_text
 
 def get_directory_tree(root_dir):
-    """
-    ディレクトリ構造をツリー記号（├──, │   など）を使って表現し、文字列として返します。
-    """
     tree_lines = []
     for dirpath, dirnames, filenames in os.walk(root_dir):
         level = dirpath.replace(root_dir, '').count(os.sep)
@@ -156,9 +134,6 @@ def get_directory_tree(root_dir):
     return "\n".join(tree_lines)
 
 def strip_code_fences(text: str) -> str:
-    """
-    Markdownコードフェンス ```...``` を除去します。
-    """
     text = re.sub(r"```[a-zA-Z]*\n", "", text)
     text = text.replace("```", "")
     return text
@@ -285,14 +260,6 @@ final_blog_prompt_template = PromptTemplate(
 # バックグラウンド処理関数
 ###############################################################################
 def process_project(progress_id, github_url, target_audience, blog_tone, additional_requirements, language, temp_project_dir):
-    """
-    バックグラウンドで:
-    1. プロジェクトファイル取得
-    2. ディレクトリ構造の取得
-    3. ファイルの役割要約
-    4. 詳細なコード解説
-    5. 取得した情報を保存（アウトライン生成は別ルートへ）
-    """
     try:
         progress_store[progress_id] = "Step 1: プロジェクトファイルの取得を開始します。\n"
         if os.listdir(temp_project_dir):
@@ -373,19 +340,37 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
         result_store[progress_id + "_analysis"] = detailed_code_analysis
         result_store[progress_id + "_files"] = project_files_content
 
+        # **アウトライン生成をここで実行**
+        progress_store[progress_id] += "Step 5: ブログアウトラインを生成中...\n"
+        outline_chain = LLMChain(llm=llm, prompt=blog_outline_prompt_template)
+        blog_outline = outline_chain.run({
+            "directory_tree": directory_tree,
+            "file_roles": file_roles,
+            "detailed_code_analysis": detailed_code_analysis,
+            "project_files_content": project_files_content,
+            "github_url": github_url,
+            "target_audience": target_audience,
+            "blog_tone": blog_tone,
+            "additional_requirements": additional_requirements,
+            "language": language
+        })
+        result_store[progress_id + "_outline"] = blog_outline
+        progress_store[progress_id] += "ブログアウトラインの生成が完了しました。\n"
+
+        # 解析データを保存
+        result_store[progress_id + "_tree"] = directory_tree
+        result_store[progress_id + "_roles"] = file_roles
+        result_store[progress_id + "_analysis"] = detailed_code_analysis
+        result_store[progress_id + "_files"] = project_files_content
+
     except Exception as e:
         progress_store[progress_id] += f"処理中にエラー発生: {e}\n"
-        logger.error("Error in processing: %s", e)
 
 ###############################################################################
 # アウトライン生成
 ###############################################################################
 @app.route("/generate_outline", methods=["GET"])
 def generate_outline():
-    """
-    process_project の後に呼ばれ、ブログの章立て（アウトライン）を生成します。
-    各章で取り上げるコードブロック（ファイル名）のリストも出力してください。
-    """
     progress_id = session.get("progress_id", None)
     if not progress_id:
         flash("progress_idがありません。", "error")
@@ -395,8 +380,7 @@ def generate_outline():
     file_roles = result_store.get(progress_id + "_roles", "")
     detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
     project_files_content = result_store.get(progress_id + "_files", "")
-
-    params = get_common_params_from_args()  # ヘルパー関数でGETパラメータを取得
+    params = get_common_params_from_args()
     try:
         llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
         outline_chain = LLMChain(llm=llm, prompt=blog_outline_prompt_template)
@@ -441,7 +425,7 @@ def preview_outline():
 ###############################################################################
 # 最終ブログ生成
 ###############################################################################
-@app.route("/generate_final_blog", methods=["GET"])
+@app.route("/generate_final_blog", methods=["GET", "POST"])
 def generate_final_blog():
     progress_id = session.get("progress_id", None)
     if not progress_id:
@@ -453,8 +437,7 @@ def generate_final_blog():
     detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
     project_files_content = result_store.get(progress_id + "_files", "")
     blog_outline = result_store.get(progress_id + "_outline", "")
-
-    params = get_common_params_from_args()  # ヘルパー関数でGETパラメータを取得
+    params = get_common_params_from_args()
     try:
         llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
         final_chain = LLMChain(llm=llm, prompt=final_blog_prompt_template)
@@ -478,33 +461,6 @@ def generate_final_blog():
         return redirect(url_for("index"))
 
 ###############################################################################
-# Helper Functions for Parameter Retrieval
-###############################################################################
-def get_common_params_from_form():
-    """
-    POSTリクエストから共通パラメータを取得する
-    """
-    return {
-        "github_url": request.form.get("github_url", "").strip(),
-        "target_audience": request.form.get("target_audience", "エンジニア全般").strip(),
-        "blog_tone": request.form.get("blog_tone", "カジュアルだけど専門性を感じるトーン").strip(),
-        "additional_requirements": request.form.get("additional_requirements", "").strip(),
-        "language": request.form.get("language", "ja").strip()
-    }
-
-def get_common_params_from_args():
-    """
-    GETリクエストのクエリパラメータから共通パラメータを取得する
-    """
-    return {
-        "github_url": request.args.get("github_url", ""),
-        "target_audience": request.args.get("target_audience", "エンジニア全般"),
-        "blog_tone": request.args.get("blog_tone", "カジュアルだけど専門性を感じるトーン"),
-        "additional_requirements": request.args.get("additional_requirements", ""),
-        "language": request.args.get("language", "ja")
-    }
-
-###############################################################################
 # メインフロー: index → process_project → ...
 ###############################################################################
 @app.route("/", methods=["GET", "POST"])
@@ -517,7 +473,6 @@ def index():
 
         github_url = params["github_url"]
         uploaded_files = request.files.getlist("project_folder")
-
         if not ((uploaded_files and len(uploaded_files) > 0) or github_url):
             flash("GithubリポジトリのURLまたはフォルダを指定してください。", "error")
             return redirect(url_for("index"))
@@ -561,10 +516,8 @@ def preview_blog():
         edited_markdown = request.form.get("edited_markdown", "")
         result_store[session.get("progress_id")] = edited_markdown
         return redirect(url_for("preview_blog"))
-
     progress_id = session.get("progress_id", None)
     blog_markdown = result_store.get(progress_id, "")
-    # Markdown の HTML 変換に fenced_code, codehilite 拡張を追加
     converted_html = markdown.markdown(blog_markdown, extensions=['fenced_code', 'codehilite'])
     progress_log = progress_store.get(progress_id, "進捗情報はありません。")
     return render_template("preview.html",

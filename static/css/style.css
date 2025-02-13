@@ -1,69 +1,97 @@
-/* 全体の背景とフォント設定 */
+/* 全体のレイアウト */
 body {
     font-family: 'Noto Sans', sans-serif;
     background-color: #f8f9fa;
     margin: 0;
     padding: 0;
     color: #333;
+    display: flex;
 }
 
-/* ヘッダー */
-h1 {
-    background-color: #343a40;
-    color: #fff;
-    padding: 1rem;
-    text-align: center;
-    margin: 0;
-}
-
-/* フォームエリア */
-form {
-    max-width: 800px;
-    margin: 2rem auto;
-    padding: 1rem;
-    background-color: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 0.25rem;
-}
-
-/* ラベルと入力エリア */
-label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: bold;
-}
-
-input[type="text"],
-input[type="url"],
-select,
-textarea {
+.container {
+    display: flex;
     width: 100%;
-    padding: 0.5rem;
-    margin-bottom: 1rem;
-    border: 1px solid #ced4da;
-    border-radius: 0.25rem;
 }
 
-/* ボタン */
-button {
+/* サイドバー */
+.sidebar {
+    width: 250px;
+    background-color: #343a40;
+    color: white;
+    padding: 1rem;
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    overflow-y: auto;
+}
+
+.sidebar h2 {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.sidebar form {
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar label {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.sidebar input, .sidebar select, .sidebar textarea {
+    margin-bottom: 1rem;
+    width: 230px;
+}
+
+.sidebar button {
+    margin-bottom: 1rem;
+    width: 140px;
+}
+
+/* メインコンテンツ */
+.main-content {
+    margin-left: 320px;
+    padding: 1rem;
+    flex-grow: 1;
+}
+
+/* タブ切り替えナビゲーション */
+.tab-nav {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.tab-nav button {
     background-color: #007bff;
     color: #fff;
     border: none;
     padding: 0.75rem 1.5rem;
     border-radius: 0.25rem;
     cursor: pointer;
+    margin-right: 10px;
 }
 
-button:hover {
+.tab-nav button:hover {
     background-color: #0056b3;
+}
+
+/* タブコンテンツ */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
 }
 
 /* 進捗表示エリア */
 #progress {
-    max-width: 800px;
-    margin: 1rem auto;
-    padding: 1rem;
-    border: 1px solid #ced4da;
+    border: 1px solid #ccc;
+    padding: 1em;
     background-color: #e9ecef;
     border-radius: 0.25rem;
     white-space: pre-wrap;
@@ -143,13 +171,12 @@ ul.flashes li.warning {
 }
 
 .codehilite pre {
-    background: none; /* デフォルトの背景色を削除 */
+    background: none;
     border: none;
     padding: 0;
     overflow: auto;
 }
 
-/* コードブロック全体 */
 .codehilite code {
     font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
     font-size: 0.9em;

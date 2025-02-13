@@ -7,26 +7,64 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pygments.css') }}">
 </head>
 <body>
-    <h1>Blog Preview</h1>
+    <div class="container">
+        <!-- サイドバー（常に表示） -->
+        <aside class="sidebar">
+            <h2>情報入力</h2>
+            <form id="projectForm" method="POST" enctype="multipart/form-data">
+                <label>プロジェクトのフォルダ選択:<br>
+                    <input type="file" name="project_folder" webkitdirectory directory multiple>
+                </label>
+                <br><br>
+                <label>GithubリポジトリのURL:<br>
+                    <input type="url" name="github_url" placeholder="https://github.com/your-repo">
+                </label>
+                <br><br>
+                <label>ターゲット読者層:<br>
+                    <input type="text" name="target_audience" value="エンジニア全般">
+                </label>
+                <br><br>
+                <label>ブログのトーン:<br>
+                    <input type="text" name="blog_tone" value="カジュアルだけど専門性を感じるトーン">
+                </label>
+                <br><br>
+                <label>言語の選択:<br>
+                    <select name="language">
+                        <option value="ja" selected>日本語</option>
+                        <option value="en">English</option>
+                    </select>
+                </label>
+                <br><br>
+                <label>その他リクエスト:
+                    <textarea name="additional_requirements" rows="3"></textarea>
+                </label>
+                <br><br>
+                <button type="submit">テックブログを生成する</button>
+            </form>
+        </aside>
 
-    <!-- Markdown エディター（必要に応じて編集可能） -->
-    <form method="POST">
-        <textarea name="edited_markdown" rows="25" cols="100">{{ blog_markdown|e }}</textarea><br><br>
-        <button type="submit">プレビューを更新</button>
-    </form>
-    
-    <hr>
-    <h2>プレビュー (Markdown → HTML)</h2>
-    <div id="preview-container">
-        {{ converted_html|safe }}
+        <!-- メインコンテンツ -->
+        <main class="main-content">
+            <!-- タブナビゲーション -->
+            <nav class="tab-nav">
+                <button onclick="showTab('home')">最初の画面</button>
+                <button onclick="showTab('outline')">アウトライン確認</button>
+                <button onclick="showTab('blog')">ブログ確認</button>
+            </nav>
+
+            <h1>ブログ確認</h1>
+            <form id="blogForm" method="POST">
+                <textarea name="edited_markdown" rows="25" cols="100">{{ blog_markdown|e }}</textarea>
+                <br><br>
+                <button type="button" onclick="submitBlog()">プレビューを更新</button>
+            </form>
+            <hr>
+            <h2>プレビュー (Markdown → HTML)</h2>
+            <div id="preview-container">{{ converted_html|safe }}</div>
+            <br>
+            <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
+        </main>
     </div>
-    
-    <br>
-    <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
-    <br><br>
-    <a href="{{ url_for('index') }}">最初の画面へ戻る</a>
-    
-    <!-- 外部JavaScriptファイルの読み込み -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
