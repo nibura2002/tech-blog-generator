@@ -45,13 +45,6 @@
 
         <!-- メインコンテンツ -->
         <main class="main-content">
-            <!-- タブナビゲーション -->
-            <nav class="tab-nav">
-                <button onclick="showTab('home')">最初の画面</button>
-                <button onclick="showTab('outline')">アウトライン確認</button>
-                <button onclick="showTab('blog')">ブログ確認</button>
-            </nav>
-
             <h1>ブログ確認</h1>
             <form id="blogForm" method="POST">
                 <textarea name="edited_markdown" rows="25" cols="100">{{ blog_markdown|e }}</textarea>
@@ -64,6 +57,14 @@
             <br>
             <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
         </main>
+
+        <!-- フッターにページ遷移用のリンクを追加 -->
+        <footer>
+            <a href="{{ url_for('index') }}">最初の画面</a> |
+            <a href="{{ url_for('preview_outline') }}">アウトライン確認</a> |
+            <a href="{{ url_for('preview_blog') }}">ブログ確認</a>
+        </footer>        
+
     </div>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>

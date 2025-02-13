@@ -44,13 +44,6 @@
 
         <!-- メインコンテンツ -->
         <main class="main-content">
-            <!-- タブナビゲーション -->
-            <nav class="tab-nav">
-                <button onclick="showTab('home')">最初の画面</button>
-                <button onclick="showTab('outline')">アウトライン確認</button>
-                <button onclick="showTab('blog')">ブログ確認</button>
-            </nav>
-
             <h1>アウトライン確認</h1>
             <form id="outlineForm">
                 <textarea name="edited_outline" rows="20" cols="100">{{ blog_outline|e }}</textarea>
@@ -58,12 +51,15 @@
                 <button type="button" id="generateButton" onclick="submitOutline()">このアウトラインで最終ブログを生成</button>
                 <p id="processingMessage" style="display:none; color: black;">最終ブログを生成中… しばらくお待ちください。</p>
             </form>
-
-            <!-- 進捗情報の表示 -->
-            <div id="progress">
-                進捗情報をここに表示します…
-            </div>
         </main>
+
+        <!-- フッターにページ遷移用のリンクを追加 -->
+        <footer>
+            <a href="{{ url_for('index') }}">最初の画面</a> |
+            <a href="{{ url_for('preview_outline') }}">アウトライン確認</a> |
+            <a href="{{ url_for('preview_blog') }}">ブログ確認</a>
+        </footer>        
+
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>

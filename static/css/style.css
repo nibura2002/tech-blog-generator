@@ -58,34 +58,26 @@ body {
     flex-grow: 1;
 }
 
-/* タブ切り替えナビゲーション */
-.tab-nav {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 1rem;
+/* フッター */
+footer {
+    background-color: #f8f9fa;
+    color: white;
+    text-align: center;
+    padding: 1rem;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
 }
 
-.tab-nav button {
-    background-color: #007bff;
-    color: #fff;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 0.25rem;
-    cursor: pointer;
-    margin-right: 10px;
+footer a {
+    /* Blue color */
+    color: #007bff;
+    text-decoration: none;
+    margin: 0 10px;
 }
 
-.tab-nav button:hover {
-    background-color: #0056b3;
-}
-
-/* タブコンテンツ */
-.tab-content {
-    display: none;
-}
-
-.tab-content.active {
-    display: block;
+footer a:hover {
+    text-decoration: underline;
 }
 
 /* 進捗表示エリア */

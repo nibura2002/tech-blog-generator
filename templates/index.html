@@ -42,51 +42,27 @@
             </form>
         </aside>
 
-        <!-- メインコンテンツ（タブ切り替え） -->
+        <!-- メインコンテンツ -->
         <main class="main-content">
-            <nav class="tab-nav">
-                <button onclick="showTab('home')">最初の画面</button>
-                <button onclick="showTab('outline')">アウトライン確認</button>
-                <button onclick="showTab('blog')">ブログ確認</button>
-            </nav>
-
-            <div id="home" class="tab-content active">
-                <h1>Tech Blog Generator</h1>
-                {% with messages = get_flashed_messages(category_filter=["error", "info", "warning"]) %}
-                  {% if messages %}
-                    <ul class="flashes">
-                      {% for message in messages %}
-                        <li>{{ message }}</li>
-                      {% endfor %}
-                    </ul>
-                  {% endif %}
-                {% endwith %}
-                <div id="progress">進捗情報をここに表示します…</div>
-            </div>
-
-            <div id="outline" class="tab-content">
-                <h1>アウトライン確認</h1>
-                <form id="outlineForm">
-                    <textarea name="edited_outline" rows="20">{{ blog_outline|e }}</textarea>
-                    <br><br>
-                    <button type="button" onclick="submitOutline()">このアウトラインで最終ブログを生成</button>
-                </form>
-            </div>
-
-            <div id="blog" class="tab-content">
-                <h1>ブログ確認</h1>
-                <form id="blogForm">
-                    <textarea name="edited_markdown" rows="25">{{ blog_markdown|e }}</textarea>
-                    <br><br>
-                    <button type="button" onclick="submitBlog()">プレビューを更新</button>
-                </form>
-                <hr>
-                <h2>プレビュー (Markdown → HTML)</h2>
-                <div id="preview-container">{{ converted_html|safe }}</div>
-                <br>
-                <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
-            </div>
+            <h1>Tech Blog Generator</h1>
+            {% with messages = get_flashed_messages(category_filter=["error", "info", "warning"]) %}
+              {% if messages %}
+                <ul class="flashes">
+                  {% for message in messages %}
+                    <li>{{ message }}</li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            {% endwith %}
+            <div id="progress">進捗情報をここに表示します…</div>
         </main>
+
+        <!-- フッターにページ遷移用のリンクを追加 -->
+        <footer>
+            <a href="{{ url_for('index') }}">最初の画面</a> |
+            <a href="{{ url_for('preview_outline') }}">アウトライン確認</a> |
+            <a href="{{ url_for('preview_blog') }}">ブログ確認</a>
+        </footer>
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>

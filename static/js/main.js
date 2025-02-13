@@ -1,32 +1,27 @@
 // main.js
 
-// タブ切り替え
-function showTab(tabId) {
-  document.querySelectorAll(".tab-content").forEach(tab => {
-      tab.classList.remove("active");
-  });
-  document.getElementById(tabId).classList.add("active");
-}
-
 // 進捗情報のポーリング
 document.addEventListener("DOMContentLoaded", function() {
   const progressElem = document.getElementById("progress");
+  let pollingInterval;
+
   if (progressElem) {
       function fetchProgress() {
           fetch("/progress")
               .then(response => response.json())
               .then(data => {
                   progressElem.innerText = data.progress;
+
+                  // アウトライン作成が完了したらポーリングを停止して遷移
                   if (data.progress.includes("ブログアウトラインの生成が完了しました")) {
+                      clearInterval(pollingInterval); // ポーリング停止
                       window.location.href = "/preview_outline";
-                  }
-                  if (data.progress.includes("最終ブログの生成が完了しました")) {
-                      window.location.href = "/preview_blog";
                   }
               })
               .catch(err => console.error("進捗情報の取得に失敗:", err));
       }
-      setInterval(fetchProgress, 3000);
+
+      pollingInterval = setInterval(fetchProgress, 3000); // ポーリング開始
   }
 });
 
@@ -35,7 +30,6 @@ function submitOutline() {
   const generateButton = document.getElementById("generateButton");
   const processingMessage = document.getElementById("processingMessage");
 
-  // ボタン無効化＆処理中メッセージ表示
   generateButton.disabled = true;
   processingMessage.style.display = "block";
 
@@ -53,7 +47,7 @@ function submitOutline() {
   .catch(error => {
       console.error("アウトライン送信エラー:", error);
       processingMessage.innerText = "エラーが発生しました。もう一度試してください。";
-      generateButton.disabled = false; // エラー時にボタンを再有効化
+      generateButton.disabled = false;
   });
 }
 
