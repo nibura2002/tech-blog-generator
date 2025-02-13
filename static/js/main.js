@@ -17,9 +17,11 @@ document.addEventListener("DOMContentLoaded", function() {
               .then(response => response.json())
               .then(data => {
                   progressElem.innerText = data.progress;
-                  // 「ブログアウトラインの生成が完了しました。」が含まれている場合、アウトライン確認画面へ遷移
                   if (data.progress.includes("ブログアウトラインの生成が完了しました")) {
                       window.location.href = "/preview_outline";
+                  }
+                  if (data.progress.includes("最終ブログの生成が完了しました")) {
+                      window.location.href = "/preview_blog";
                   }
               })
               .catch(err => console.error("進捗情報の取得に失敗:", err));
