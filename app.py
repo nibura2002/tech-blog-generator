@@ -180,6 +180,10 @@ code_detail_prompt_template = PromptTemplate(
 {file_content}
 ```
 ----------------------------------------
+
+【出力要件】
+- 決められた形式のアウトプット以外の出力は禁止です。それ以外の補足説明等は禁止です。
+
 以下、対象ファイルのコードです:
 {file_content}
 """
@@ -215,6 +219,7 @@ blog_outline_prompt_template = PromptTemplate(
 【出力要件】
 - ブログ全体のアウトラインを、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた形式で箇条書きしてください。
 - 各章・節には、取り上げる話題および対応するコードブロック（対象ファイルのコードブロックそのもの）のリストを示してください。
+- テックブログの読者は処理の流れにへの興味が強いため、処理の流れと対応するコードブロックに関する章、節、項は細かく記述した上で、機能全体を網羅できるようにしてください。
 - Markdown形式で出力してください。
 """
 )
@@ -252,7 +257,9 @@ final_blog_prompt_template = PromptTemplate(
 - アウトラインに沿って、読みやすいMarkdown形式の記事を作成してください。
 - 記事は、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた構成で、各章には取り上げる話題と対応するコードブロック（対象ファイルのコードブロックそのもの）のリストが含まれていること。
 - コードブロックは省略せず、完全な内容を示してください。
-- 最後はハッピーなトーンで記事を締めくくってください。
+- テックブログの読者は処理の流れにへの興味が強いため、処理の流れと対応するコードブロックの説明のボリュームを多くしてください。
+- 各項の文字数は、コードを除いて100文字以上必要です。100-500文字程度にしてください
+- アウトプットが長くなった場合、分割して出力してください。省略は禁止です。   
 """
 )
 
@@ -282,7 +289,7 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
         logger.info("Directory tree obtained.")
 
         progress_store[progress_id] += "Step 3: 各ファイルの役割を要約中...\n"
-        llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
+        llm = ChatOpenAI(model_name="o3-mini", openai_api_key=openai_api_key)
         file_role_chain = LLMChain(llm=llm, prompt=file_role_prompt_template)
         file_roles = file_role_chain.run({"directory_tree": directory_tree})
         progress_store[progress_id] += "各ファイルの役割要約完了。\n"
