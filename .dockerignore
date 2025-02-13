@@ -1,0 +1,20 @@
+# 仮想環境関連のディレクトリ
+.venv/
+env/
+venv/
+
+# Python キャッシュ
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 環境変数ファイル（もし本番環境では外部から環境変数を注入する場合）
+.env
+
+# Git 関連
+.git
+.gitignore
+
+# ログファイルなど
+*.log

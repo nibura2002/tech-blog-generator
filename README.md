@@ -21,113 +21,124 @@
 - **Markdown ダウンロード**  
   - 生成された記事を Markdown ファイルとしてダウンロードできます。
 
+---
+
 ## 技術スタック
 
-- **Python 3.8+**
+- **Python 3.12**
 - **Flask** – 軽量な Web フレームワーク
 - **LangChain** & **OpenAI GPT-4** – 自然言語処理・文章生成
 - **Markdown** – ブログ記事生成用
 - **Poetry** – 依存関係管理ツール
+- **Docker** – コンテナ化して簡単に環境構築
 
-## インストール
+---
 
-1. リポジトリをクローンします:
+## インストール & 実行方法
 
-    ```bash
-    git clone https://github.com/your_username/tech-blog-generator.git
-    cd tech-blog-generator
-    ```
+### 1. ローカル環境で実行
+#### 1.1 リポジトリをクローン
+```bash
+git clone https://github.com/your_username/tech-blog-generator.git
+cd tech-blog-generator
+```
 
-2. Poetry を使って依存パッケージをインストールします:
+#### 1.2 Poetry で依存パッケージをインストール
+```bash
+poetry install
+```
 
-    ```bash
-    poetry install
-    ```
+#### 1.3 環境変数を設定
+プロジェクトルートに `.env` ファイルを作成し、以下の環境変数を設定してください。
 
-3. プロジェクトルートに `.env` ファイルを作成し、以下の環境変数を設定してください:
+```env
+OPENAI_API_KEY=your_openai_api_key
+FLASK_SECRET_KEY=your_secret_key
+PORT=8080  # 必要に応じて変更
+```
 
-    ```env
-    OPENAI_API_KEY=your_openai_api_key
-    FLASK_SECRET_KEY=your_secret_key
-    PORT=8080  # 必要に応じて変更
-    ```
+#### 1.4 アプリケーションを起動
+```bash
+poetry run python app.py
+```
 
-## 使い方
+#### 1.5 アクセス
+ブラウザで `http://localhost:8080` にアクセスしてください。
 
-1. アプリケーションを起動します:
+---
 
-    ```bash
-    poetry run python app.py
-    ```
+### 2. Docker で実行
+このアプリは **Docker** で実行可能です。
 
-2. ブラウザで `http://localhost:8080` にアクセスしてください。
+#### 2.1 Docker イメージをビルド
+`Dockerfile` があるプロジェクトルートで以下のコマンドを実行してください。
 
-3. トップページのフォームに、**GitHub リポジトリの URL** または **プロジェクトフォルダ** を指定し、ターゲット読者、ブログのトーン、その他の要件を入力して送信します。
+```bash
+docker build -t tech-blog-generator .
+```
 
-4. 送信後、バックグラウンドでプロジェクト解析が開始され、進捗状況が表示されます。
+#### 2.2 Docker コンテナを起動
+環境変数を `.env` ファイルで管理する場合：
+```bash
+docker run --env-file .env -p 8501:8080 tech-blog-generator
+```
 
-5. 解析完了後、生成されたブログアウトラインをプレビュー・編集し、最終的なテックブログ記事を生成します。
+または、環境変数をコマンドラインで指定する場合：
+```bash
+docker run -e OPENAI_API_KEY=your_api_key_here -p 8501:8080 tech-blog-generator
+```
 
-6. 生成された記事は、プレビュー画面から Markdown ファイルとしてダウンロード可能です。
+#### 2.3 アクセス
+ブラウザで `http://localhost:8501` にアクセスしてください。
 
-## API エンドポイント
-
-- `GET /`  
-  トップページ。プロジェクト解析開始用のフォームを表示します。
-
-- `POST /`  
-  プロジェクト解析処理を開始（バックグラウンドで実行）。
-
-- `GET /progress`  
-  解析進捗状況を JSON 形式で取得します。
-
-- `GET /generate_outline`  
-  解析結果をもとにブログアウトラインを生成します。
-
-- `GET, POST /preview_outline`  
-  生成されたアウトラインのプレビューおよび編集画面。
-
-- `GET /generate_final_blog`  
-  最終テックブログ記事を生成します。
-
-- `GET, POST /preview_blog`  
-  生成されたブログ記事のプレビューおよび編集画面。
-
-- `GET /download_markdown`  
-  生成された Markdown ファイルをダウンロードします。
+---
 
 ## ディレクトリ構成
-
-```tree
+```bash
 .
 ├── README.md
 ├── app.py
 ├── poetry.lock
 ├── pyproject.toml
+├── Dockerfile
+├── .env.example
 └── templates
     ├── index.html
     ├── preview.html
-    └── preview_outline.html
+    ├── preview_outline.html
+└── static
+    ├── css
+    │   ├── style.css
+    │   ├── pygments.css
+    ├── js
+    │   ├── main.js
 ```
 
-## 注意事項\
+---
 
-- GitHub リポジトリのクローン時に認証が必要な場合は、適切な認証方法を設定してください。
-- 対象ファイルの解析には時間がかかる場合があります（特に大規模プロジェクトの場合）。
-- セキュリティ上の理由から、アップロードされたファイルの取り扱いには十分注意してください。
+## 注意事項
+- **GitHub リポジトリのクローン時に認証が必要な場合**  
+  GitHub のパーソナルアクセストークン (PAT) を `.env` に追加するか、SSH キー認証を設定してください。
 
-<!-- 以下はテンプレ -->
-<!-- 
-## 貢献
+- **解析対象のプロジェクトが大規模な場合**  
+  解析には時間がかかる場合があります。特に大規模なリポジトリを GitHub からクローンする場合、待機時間に注意してください。
 
+- **セキュリティに関する注意**  
+  `.env` には API キーなどの機密情報が含まれるため、`.dockerignore` に `.env` を追加し、リポジトリに含めないようにしてください。
+
+<!--
+---
+
+## 貢献方法
 バグ報告や機能改善の Pull Request を歓迎します。Issue や Pull Request を通じてご意見・ご要望をお寄せください。
 
-## ライセンス
+---
 
+## ライセンス
 このプロジェクトは [MIT License](LICENSE) の下で公開されています。
 
 ---
 
-**お問い合わせ**  
+## お問い合わせ
 ご質問やご意見がありましたら、[your_email@example.com](mailto:your_email@example.com) までご連絡ください。
 -->
