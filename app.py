@@ -51,9 +51,35 @@ progress_store = {}
 result_store = {}
 
 ###############################################################################
+# Helper Functions for Parameter Retrieval
+###############################################################################
+def get_common_params_from_form():
+    """
+    POSTリクエストから共通パラメータを取得する
+    """
+    return {
+        "github_url": request.form.get("github_url", "").strip(),
+        "target_audience": request.form.get("target_audience", "エンジニア全般").strip(),
+        "blog_tone": request.form.get("blog_tone", "カジュアルだけど専門性を感じるトーン").strip(),
+        "additional_requirements": request.form.get("additional_requirements", "").strip(),
+        "language": request.form.get("language", "ja").strip()
+    }
+
+def get_common_params_from_args():
+    """
+    GETリクエストのクエリパラメータから共通パラメータを取得する
+    """
+    return {
+        "github_url": request.args.get("github_url", ""),
+        "target_audience": request.args.get("target_audience", "エンジニア全般"),
+        "blog_tone": request.args.get("blog_tone", "カジュアルだけど専門性を感じるトーン"),
+        "additional_requirements": request.args.get("additional_requirements", ""),
+        "language": request.args.get("language", "ja")
+    }
+
+###############################################################################
 # Utility functions
 ###############################################################################
-
 def read_project_files(root_dir):
     """
     指定ディレクトリ以下のすべてのファイルを再帰的に読み込み、テキストを連結して返します。
@@ -71,19 +97,12 @@ def read_project_files(root_dir):
 
     disallowed_extensions = (
         ".lock",
-        # 画像
         ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".tiff", ".ico",
-        # 動画
         ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv",
-        # 音声
         ".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a",
-        # 圧縮ファイル
         ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz",
-        # 実行ファイル
         ".exe", ".dll", ".so", ".bin", ".app", ".msi", ".deb", ".rpm",
-        # フォント
         ".ttf", ".otf", ".woff", ".woff2",
-        # Office系（バイナリの場合）
         ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"
     )
 
@@ -147,7 +166,6 @@ def strip_code_fences(text: str) -> str:
 ###############################################################################
 # PromptTemplates
 ###############################################################################
-
 file_role_prompt_template = PromptTemplate(
     input_variables=["directory_tree"],
     template="""
@@ -159,35 +177,57 @@ file_role_prompt_template = PromptTemplate(
 )
 
 code_detail_prompt_template = PromptTemplate(
-    input_variables=["file_content", "file_path"],
+    input_variables=["file_content", "file_path", "language"],
     template="""
-以下はファイル「{file_path}」の完全なコードです。  
-機能ごとにコードを解説し、コードブロックを省略せず示してください。
-最後にファイル全体のコードをまとめて再掲してください。
+# ファイル名: {file_path}
 
-ファイルのコード:
+以下はファイル「{file_path}」の完全なコードです。  
+解説は {language} で行ってください。  
+出力は以下の2部構成に従い、Markdown形式で記述してください.
+
+----------------------------------------
+【セクション 1: 機能概要とコードブロックのペア】
+
+各主要な機能について、**章**（大項目）、**節**（中項目）、**項**（小項目）に分け、それぞれに対して以下の形式で出力してください。
+
+- **機能名/セクション名**: [ここに機能の名前またはセクションのタイトル]
+  - **機能概要**:  
+    この機能の目的、処理の流れ、設計意図、エラーハンドリングの実装について記載してください。
+  - **対応するコードブロック**:  
+    この機能に対応するコードを完全な形で記載してください。（省略せず、全行を示すこと）
+
+----------------------------------------
+【セクション 2: ファイル全体のコード】
+
+- **ファイル名**: {file_path}
+- **コード全文**:
+```python
+{file_content}
+```
+----------------------------------------
+以下、対象ファイルのコードです:
 {file_content}
 """
 )
 
 blog_outline_prompt_template = PromptTemplate(
-    input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "project_files_content", "github_url", "target_audience", "blog_tone", "additional_requirements"],
+    input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "project_files_content", "github_url", "target_audience", "blog_tone", "additional_requirements", "language"],
     template="""
-あなたは有能なソフトウェアエンジニア兼テックライターです。
+あなたは有能なソフトウェアエンジニア兼テックライターです。  
 以下のコンテキスト情報を基に、テックブログの章立て（アウトライン）を考案してください。
 
 【コンテキスト】
-1) **ディレクトリ構造**:
+1) **ディレクトリ構造**:  
 {directory_tree}
 
-2) **ファイルの役割概要**:
+2) **ファイルの役割概要**:  
 {file_roles}
 
 3) **詳細なコード解説**  
-   (各機能と対応するコードブロックのペアを、コードの流れに沿ってまとめる):
+   (各機能と対応するコードブロックのペアを、コードの流れに沿ってまとめる):  
 {detailed_code_analysis}
 
-4) **全ファイル内容** (参考用):
+4) **全ファイル内容** (参考用):  
 {project_files_content}
 
 【追加情報】
@@ -195,10 +235,11 @@ blog_outline_prompt_template = PromptTemplate(
 - 想定読者: {target_audience}
 - トーン: {blog_tone}
 - その他リクエスト: {additional_requirements}
+- 解説言語: {language}
 
 【出力要件】
-- ブログ全体の章立てを、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた形式で箇条書きしてください。
-- 各章・節には、取り上げる話題および対応するコードブロック（対象ファイル名）のリストを示してください。
+- ブログ全体のアウトラインを、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた形式で箇条書きしてください。
+- 各章・節には、取り上げる話題および対応するコードブロック（対象ファイルのコードブロックそのもの）のリストを示してください。
 - Markdown形式で出力してください。
 """
 )
@@ -208,22 +249,22 @@ final_blog_prompt_template = PromptTemplate(
     template="""
 あなたは有能なソフトウェアエンジニア兼テックライターです。
 
-以下の情報とアウトラインを基に、最終的なテックブログ記事を{language}で作成してください。
+以下の情報と、事前に確定したアウトラインを基に、最終的なテックブログ記事を{language}で作成してください。
 
 【事前に確定したアウトライン】
 {blog_outline}
 
 【その他のコンテキスト】
-1) **ディレクトリ構造**:
+1) **ディレクトリ構造**:  
 {directory_tree}
 
-2) **ファイルの役割概要**:
+2) **ファイルの役割概要**:  
 {file_roles}
 
-3) **詳細なコード解説**:
+3) **詳細なコード解説**:  
 {detailed_code_analysis}
 
-4) **全ファイル内容**:
+4) **全ファイル内容**:  
 {project_files_content}
 
 【追加情報】
@@ -234,7 +275,7 @@ final_blog_prompt_template = PromptTemplate(
 
 【出力要件】
 - アウトラインに沿って、読みやすいMarkdown形式の記事を作成してください。
-- 記事は、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた構成で、各章には取り上げる話題と対応するコードブロック（ファイル名）のリストが含まれていること。
+- 記事は、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた構成で、各章には取り上げる話題と対応するコードブロック（対象ファイルのコードブロックそのもの）のリストが含まれていること。
 - コードブロックは省略せず、完全な内容を示してください。
 - 最後はハッピーなトーンで記事を締めくくってください。
 """
@@ -243,7 +284,6 @@ final_blog_prompt_template = PromptTemplate(
 ###############################################################################
 # バックグラウンド処理関数
 ###############################################################################
-
 def process_project(progress_id, github_url, target_audience, blog_tone, additional_requirements, language, temp_project_dir):
     """
     バックグラウンドで:
@@ -284,8 +324,23 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
         progress_store[progress_id] += "Step 4: 各ファイルの詳細なコード解説を取得中...\n"
         detailed_code_analysis = ""
         all_files = []
+        disallowed_extensions = (
+            ".lock",
+            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".tiff", ".ico",
+            ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv",
+            ".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a",
+            ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz",
+            ".exe", ".dll", ".so", ".bin", ".app", ".msi", ".deb", ".rpm",
+            ".ttf", ".otf", ".woff", ".woff2",
+            ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"
+        )
         for dirpath, dirnames, filenames in os.walk(temp_project_dir):
+            dirnames[:] = [d for d in dirnames if "__pycache__" not in d]
             for file in filenames:
+                if file.lower().endswith(disallowed_extensions):
+                    continue
+                if "__pycache__" in dirpath:
+                    continue
                 all_files.append(os.path.join(dirpath, file))
         total_files = len(all_files)
         progress_store[progress_id] += f"対象ファイル数: {total_files} 件\n"
@@ -301,7 +356,8 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
                 code_detail_chain = LLMChain(llm=llm, prompt=code_detail_prompt_template)
                 file_detail = code_detail_chain.run({
                     "file_path": relative_file_path,
-                    "file_content": file_content
+                    "file_content": file_content,
+                    "language": language
                 })
                 detailed_code_analysis += f"\n\n## {relative_file_path}\n" + file_detail
             except Exception as e:
@@ -312,7 +368,6 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
 
         progress_store[progress_id] += "一旦基本情報の抽出が完了しました。\n"
         
-        # 取得情報を result_store に保存
         result_store[progress_id + "_tree"] = directory_tree
         result_store[progress_id + "_roles"] = file_roles
         result_store[progress_id + "_analysis"] = detailed_code_analysis
@@ -341,11 +396,7 @@ def generate_outline():
     detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
     project_files_content = result_store.get(progress_id + "_files", "")
 
-    github_url = request.args.get("github_url", "")
-    target_audience = request.args.get("target_audience", "エンジニア全般")
-    blog_tone = request.args.get("blog_tone", "カジュアルだけど専門性を感じるトーン")
-    additional_requirements = request.args.get("additional_requirements", "")
-
+    params = get_common_params_from_args()  # ヘルパー関数でGETパラメータを取得
     try:
         llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
         outline_chain = LLMChain(llm=llm, prompt=blog_outline_prompt_template)
@@ -354,10 +405,11 @@ def generate_outline():
             "file_roles": file_roles,
             "detailed_code_analysis": detailed_code_analysis,
             "project_files_content": project_files_content,
-            "github_url": github_url,
-            "target_audience": target_audience,
-            "blog_tone": blog_tone,
-            "additional_requirements": additional_requirements
+            "github_url": params["github_url"],
+            "target_audience": params["target_audience"],
+            "blog_tone": params["blog_tone"],
+            "additional_requirements": params["additional_requirements"],
+            "language": params["language"]
         })
         result_store[progress_id + "_outline"] = blog_outline
         progress_store[progress_id] += "\nブログアウトラインの生成が完了しました。\n"
@@ -402,12 +454,7 @@ def generate_final_blog():
     project_files_content = result_store.get(progress_id + "_files", "")
     blog_outline = result_store.get(progress_id + "_outline", "")
 
-    github_url = request.args.get("github_url", "")
-    target_audience = request.args.get("target_audience", "エンジニア全般")
-    blog_tone = request.args.get("blog_tone", "カジュアルだけど専門性を感じるトーン")
-    additional_requirements = request.args.get("additional_requirements", "")
-    language = request.args.get("language", "ja")
-
+    params = get_common_params_from_args()  # ヘルパー関数でGETパラメータを取得
     try:
         llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
         final_chain = LLMChain(llm=llm, prompt=final_blog_prompt_template)
@@ -416,11 +463,11 @@ def generate_final_blog():
             "file_roles": file_roles,
             "detailed_code_analysis": detailed_code_analysis,
             "project_files_content": project_files_content,
-            "github_url": github_url,
-            "target_audience": target_audience,
-            "blog_tone": blog_tone,
-            "additional_requirements": additional_requirements,
-            "language": language,
+            "github_url": params["github_url"],
+            "target_audience": params["target_audience"],
+            "blog_tone": params["blog_tone"],
+            "additional_requirements": params["additional_requirements"],
+            "language": params["language"],
             "blog_outline": blog_outline
         })
         result_store[progress_id] = generated_blog
@@ -431,26 +478,54 @@ def generate_final_blog():
         return redirect(url_for("index"))
 
 ###############################################################################
+# Helper Functions for Parameter Retrieval
+###############################################################################
+def get_common_params_from_form():
+    """
+    POSTリクエストから共通パラメータを取得する
+    """
+    return {
+        "github_url": request.form.get("github_url", "").strip(),
+        "target_audience": request.form.get("target_audience", "エンジニア全般").strip(),
+        "blog_tone": request.form.get("blog_tone", "カジュアルだけど専門性を感じるトーン").strip(),
+        "additional_requirements": request.form.get("additional_requirements", "").strip(),
+        "language": request.form.get("language", "ja").strip()
+    }
+
+def get_common_params_from_args():
+    """
+    GETリクエストのクエリパラメータから共通パラメータを取得する
+    """
+    return {
+        "github_url": request.args.get("github_url", ""),
+        "target_audience": request.args.get("target_audience", "エンジニア全般"),
+        "blog_tone": request.args.get("blog_tone", "カジュアルだけど専門性を感じるトーン"),
+        "additional_requirements": request.args.get("additional_requirements", ""),
+        "language": request.args.get("language", "ja")
+    }
+
+###############################################################################
 # メインフロー: index → process_project → ...
 ###############################################################################
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
+        params = get_common_params_from_form()
         progress_id = str(uuid.uuid4())
         session["progress_id"] = progress_id
         progress_store[progress_id] = ""
 
-        github_url = request.form.get("github_url", "").strip()
+        github_url = params["github_url"]
         uploaded_files = request.files.getlist("project_folder")
 
         if not ((uploaded_files and len(uploaded_files) > 0) or github_url):
             flash("GithubリポジトリのURLまたはフォルダを指定してください。", "error")
             return redirect(url_for("index"))
 
-        target_audience = request.form.get("target_audience", "エンジニア全般").strip()
-        blog_tone = request.form.get("blog_tone", "カジュアルだけど専門性を感じるトーン").strip()
-        additional_requirements = request.form.get("additional_requirements", "").strip()
-        language = request.form.get("language", "ja")
+        target_audience = params["target_audience"]
+        blog_tone = params["blog_tone"]
+        additional_requirements = params["additional_requirements"]
+        language = params["language"]
 
         temp_project_dir = tempfile.mkdtemp()
         if uploaded_files and len(uploaded_files) > 0:
