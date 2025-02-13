@@ -45,6 +45,16 @@ app.config['ENV'] = 'production'
 app.config['DEBUG'] = False
 app.config['TESTING'] = False
 
+# Redirect to www subdomain
+@app.before_request
+def redirect_to_www():
+    host = request.headers.get("Host", "")
+    if "localhost" in host or "127.0.0.1" in host:
+        return None
+    if not host.startswith("www."):
+        target_url = request.url.replace(host, "www." + host, 1)
+        return redirect(target_url, code=301)
+
 # 進捗管理用のグローバル辞書
 progress_store = {}
 # バックグラウンドでの生成結果を格納するグローバル辞書
