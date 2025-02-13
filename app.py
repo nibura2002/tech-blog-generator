@@ -57,22 +57,82 @@ result_store = {}
 def read_project_files(root_dir):
     """
     指定ディレクトリ以下のすべてのファイルを再帰的に読み込み、テキストを連結して返します。
-    読み込みエラーが発生した場合は、そのファイルはスキップします。
+    ファイルの読み込み中にエラーが発生した場合は、そのファイルはスキップします。
+    以下の条件に合致するファイルは除外します：
+      - ファイルサイズが20MBを超える
+      - ファイルの文字数が20,000字を超える
+      - 以下の拡張子のファイル（画像、動画、音声、圧縮、実行ファイル、フォント、Office文書等）
+      - パスに "__pycache__" を含むファイル
     """
+    import os
+    
     logger.info("Reading project files from: %s", root_dir)
     all_text = []
+    max_size = 20 * 1024 * 1024  # 20MB
+    max_chars = 20000
+
+    # 除外する拡張子のリスト
+    disallowed_extensions = (
+        ".lock",
+        # 画像
+        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".tiff", ".ico",
+        # 動画
+        ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv",
+        # 音声
+        ".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a",
+        # 圧縮ファイル
+        ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz",
+        # 実行ファイル
+        ".exe", ".dll", ".so", ".bin", ".app", ".msi", ".deb", ".rpm",
+        # フォント
+        ".ttf", ".otf", ".woff", ".woff2",
+        # Office系（バイナリの場合）
+        ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"
+    )
+
     for dirpath, dirnames, filenames in os.walk(root_dir):
+        # __pycache__を含むディレクトリは除外
+        dirnames[:] = [d for d in dirnames if "__pycache__" not in d]
+
         for file in filenames:
+            # ファイルパスの作成
             file_path = os.path.join(dirpath, file)
+            
+            # 除外対象の拡張子チェック
+            if file.lower().endswith(disallowed_extensions):
+                logger.info("Skipping disallowed file: %s", file_path)
+                continue
+
+            # __pycache__ を含むパスは除外
+            if "__pycache__" in file_path:
+                logger.info("Skipping __pycache__ file: %s", file_path)
+                continue
+
+            # ファイルサイズチェック
+            try:
+                size = os.path.getsize(file_path)
+                if size > max_size:
+                    logger.info("Skipping large file (>20MB): %s (size=%d bytes)", file_path, size)
+                    continue
+            except Exception as e:
+                logger.warning("Could not determine file size for %s: %s", file_path, e)
+                continue
+
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
+                # 文字数チェック
+                if len(content) > max_chars:
+                    logger.info("Skipping file due to excessive length (>20000 chars): %s (length=%d)", file_path, len(content))
+                    continue
+
                 relative_path = os.path.relpath(file_path, root_dir)
                 header = f"\n\n### File: {relative_path}\n"
                 all_text.append(header + content)
             except Exception as e:
                 logger.warning("Could not read file %s: %s", file_path, e)
                 continue
+
     combined_text = "\n".join(all_text)
     logger.info("Completed reading project files. Total length: %d characters", len(combined_text))
     return combined_text
