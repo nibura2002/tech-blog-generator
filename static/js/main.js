@@ -3,7 +3,7 @@
 // 進捗情報のポーリング
 document.addEventListener("DOMContentLoaded", function() {
   const progressElem = document.getElementById("progress");
-  let pollingInterval;
+  let pollingInterval = null;
 
   if (progressElem) {
       function fetchProgress() {
@@ -15,6 +15,7 @@ document.addEventListener("DOMContentLoaded", function() {
                   // アウトライン作成が完了したらポーリングを停止して遷移
                   if (data.progress.includes("ブログアウトラインの生成が完了しました")) {
                       clearInterval(pollingInterval); // ポーリング停止
+                      pollingInterval = null; // 明示的にnullに設定
                       window.location.href = "/preview_outline";
                   }
               })
