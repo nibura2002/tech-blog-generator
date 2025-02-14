@@ -313,7 +313,7 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
         detailed_code_analysis = ""
         all_files = []
         disallowed_extensions = (
-            ".lock",
+            ".lock", ".gitignore", ".dockerignore", ".npmignore", ".yarnignore",
             ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".tiff", ".ico",
             ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv",
             ".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a",
