@@ -481,7 +481,6 @@ def get_full_blog(llm, initial_response, params, progress_id, max_iterations=10)
         )
         next_chunk = llm.predict(context_prompt)
         full_blog = marker_pattern.sub("", full_blog) + next_chunk
-        full_blog = strip_code_fences(full_blog)
 
     return full_blog
 
