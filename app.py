@@ -323,7 +323,7 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
             ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"
         )
         for dirpath, dirnames, filenames in os.walk(temp_project_dir):
-            dirnames[:] = [d for d in dirnames if "__pycache__" not in d]
+            dirnames[:] = [d for d in dirnames if "__pycache__" not in d and ".git" not in d and ".vscode" not in d]
             for file in filenames:
                 if file.lower().endswith(disallowed_extensions):
                     continue
