@@ -81,7 +81,7 @@ footer a:hover {
 }
 
 /* 進捗表示エリア */
-#progress, #processingMessage {
+#progress_history, #processingMessage {
     border: 1px solid #ccc;
     padding: 1em;
     background-color: #e9ecef;

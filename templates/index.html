@@ -56,6 +56,7 @@
             {% endwith %}
 
             {% if blog_markdown %}
+                <!-- 最終ブログ生成完了画面（最終確認画面）：SSE は起動しない -->
                 <h1>ブログ確認</h1>
                 <form id="blogForm" method="POST">
                     <textarea name="edited_markdown" rows="25" cols="100">{{ blog_markdown|e }}</textarea>
@@ -67,20 +68,41 @@
                 <div id="preview-container">{{ converted_html|safe }}</div>
                 <br>
                 <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
-            {% elif blog_outline %}
+                <script>
+                  // 最終生成画面ではリロード用フラグをクリア
+                  sessionStorage.removeItem("reloadTriggered");
+                </script>
+            {% elif blog_outline and viewType == "outline" %}
+                <!-- アウトライン確認画面：ユーザーが編集可能。SSE は起動しない -->
                 <h1>アウトライン確認</h1>
                 <form id="outlineForm">
                     <textarea name="edited_outline" rows="20" cols="100">{{ blog_outline|e }}</textarea>
                     <br><br>
                     <button type="button" id="generateButton" onclick="submitOutline()">このアウトラインで最終ブログを生成</button>
-                    <div id="progress">進捗情報をここに表示します…</div>
+                    <div id="processingMessage" style="display:none; margin-top:10px; color: blue;"></div>
                 </form>
+            {% elif viewType == "status" %}
+                <!-- ブログ生成ステータス画面：SSE 起動中 -->
+                <h1>ブログ生成ステータス</h1>
+                <p>現在、最終ブログ生成処理が進行中です。しばらくお待ちください。</p>
+                <!-- SSE 用 progress 要素は hidden ですが存在 -->
+                <div id="progress" style="display:none;">進捗情報をここに表示します…</div>
             {% else %}
+                <!-- 初期状態 -->
                 <h1>Tech Blog Generator</h1>
-                <div id="progress">進捗情報をここに表示します…</div>
+            {% endif %}
+            <!-- 進捗履歴表示 -->
+            {% if progress_log and viewType != "final" %}
+            <h3>進捗履歴</h3>
+            <pre id="progress_history">{{ progress_log }}</pre>
             {% endif %}
         </main>
     </div>
+    <!-- viewType を JS 変数に出力 -->
+    <script>
+       var viewType = "{{ viewType }}";
+       console.log("viewType:", viewType);
+    </script>
     <footer></footer>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
