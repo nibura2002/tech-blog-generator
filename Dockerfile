@@ -35,4 +35,4 @@ USER appuser
 EXPOSE 8080
 
 # Use Gunicorn to run the application (assumes the Flask app object is defined in app:app)
-CMD ["gunicorn", "-w", "1", "--timeout", "3600", "-b", "0.0.0.0:8080", "app:app"]
+CMD ["gunicorn", "-w", "1", "--worker-class", "gthread", "--threads", "4", "--timeout", "3600", "-b", "0.0.0.0:8080", "app:app"]
