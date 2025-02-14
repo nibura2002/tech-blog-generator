@@ -231,6 +231,7 @@ blog_outline_prompt_template = PromptTemplate(
 - 各章・節には、取り上げる話題および対応するコードブロック（対象ファイルのコードブロックそのもの）のリストを示してください。
 - テックブログの読者は処理の流れにへの興味が強いため、処理の流れと対応するコードブロックに関する章、節、項は細かく記述した上で、機能全体を網羅できるようにしてください。
 - Markdown形式で出力してください。
+- ブログのアウトライン以外の出力は禁止です。補足的な説明等も処理の邪魔になるため、記述しないでください。
 """
 )
 
@@ -269,7 +270,10 @@ final_blog_prompt_template = PromptTemplate(
 - コードブロックは省略せず、完全な内容を示してください。
 - テックブログの読者は処理の流れにへの興味が強いため、処理の流れと対応するコードブロックの説明のボリュームを多くしてください。
 - 各項の文字数は、コードを除いて100文字以上必要です。100-500文字程度にしてください
-- アウトプットが長くなった場合、分割して出力してください。省略は禁止です。   
+- アウトプットが長くなった場合、分割して出力してください。省略は禁止です。
+- 分割する場合、最後に[続く]というマーカーで終了する必要があります。
+- [続く]マーカーは必ずそのコードブロックを終了するための ``` よりも後に記載し、[続く]のマーカーで終了する必要があります
+- ブログ記事以外の出力は禁止です。補足的な説明等も処理の邪魔になるため、記述しないでください。
 """
 )
 
@@ -386,12 +390,61 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
 ###############################################################################
 # バックグラウンド処理関数（最終ブログ生成）
 ###############################################################################
+def get_full_blog(llm, initial_response, params, progress_id, max_iterations=5):
+    """
+    これまでのブログ生成結果(initial_response)に加え、ブログ生成に使用した
+    すべての情報をプロンプトに含めて、続きを取得する。
+    """
+    # 各入力情報を取得
+    directory_tree = result_store.get(progress_id + "_tree", "")
+    file_roles = result_store.get(progress_id + "_roles", "")
+    detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
+    project_files_content = result_store.get(progress_id + "_files", "")
+    blog_outline = result_store.get(progress_id + "_outline", "")
+    
+    full_blog = initial_response
+    for _ in range(max_iterations):
+        if not full_blog.strip().endswith("[続く]"):
+            break
+
+        # すべての入力情報とこれまでの出力内容を含む継続プロンプトを作成
+        context_prompt = (
+            "以下は最終テックブログ記事生成に使用された全ての情報です。\n\n"
+            "【ディレクトリ構造】:\n"
+            f"{directory_tree}\n\n"
+            "【ファイルの役割概要】:\n"
+            f"{file_roles}\n\n"
+            "【詳細なコード解説】:\n"
+            f"{detailed_code_analysis}\n\n"
+            "【全ファイル内容】:\n"
+            f"{project_files_content}\n\n"
+            "【ブログアウトライン】:\n"
+            f"{blog_outline}\n\n"
+            "【その他のパラメータ】:\n"
+            f"GitHubリポジトリURL: {params.get('github_url', '')}\n"
+            f"想定読者: {params.get('target_audience', '')}\n"
+            f"トーン: {params.get('blog_tone', '')}\n"
+            f"追加リクエスト: {params.get('additional_requirements', '')}\n"
+            f"解説言語: {params.get('language', '')}\n\n"
+            "以下はこれまでに生成されたブログ記事の内容です:\n"
+            f"{full_blog}\n\n"
+            "上記の文脈に基づいて、ブログ記事の続きを出力してください。"
+            "コードブロックが途中で切れている場合は、必ず正しく閉じた上で続きを出力し、"
+            "出力が分割される場合は必ず末尾に[続く]マーカーを付けてください。"
+        )
+        next_chunk = llm.predict(context_prompt)
+        # [続く]マーカーを削除して次のチャンクを追加
+        full_blog = full_blog.replace("[続く]", "") + next_chunk
+    return full_blog
+
 def process_final_blog(progress_id, params):
     try:
-        progress_store[progress_id] += "Step X: 最終テックブログ生成処理を開始します。\n"
+        progress_store[progress_id] += "Step 6: 最終テックブログ生成処理を開始します。\n"
         llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
         final_chain = LLMChain(llm=llm, prompt=final_blog_prompt_template)
-        generated_blog = final_chain.run({
+        
+        # 最初のレスポンスを取得
+        initial_response = final_chain.run({
             "directory_tree": result_store.get(progress_id + "_tree", ""),
             "file_roles": result_store.get(progress_id + "_roles", ""),
             "detailed_code_analysis": result_store.get(progress_id + "_analysis", ""),
@@ -403,7 +456,11 @@ def process_final_blog(progress_id, params):
             "language": params["language"],
             "blog_outline": result_store.get(progress_id + "_outline", "")
         })
-        result_store[progress_id] = generated_blog
+        
+        # もし最初のレスポンスが途中で切れていたら追加入力して続きを取得
+        full_blog = get_full_blog(llm, initial_response, params, progress_id)
+        
+        result_store[progress_id] = full_blog
         progress_store[progress_id] += "最終テックブログの生成が完了しました。\n"
     except Exception as e:
         progress_store[progress_id] += f"最終テックブログ生成中にエラーが発生しました: {e}\n"

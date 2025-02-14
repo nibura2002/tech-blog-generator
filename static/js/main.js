@@ -117,7 +117,8 @@ function startFinalBlogPolling() {
             .then(data => {
                 processingMessage.innerHTML = 
                     "<h1>ブログ生成中...</h1>" +
-                    "<p>現在、最終テックブログの生成処理が進行中です。しばらくお待ちください。</p>";
+                    "<p>現在、最終テックブログの生成処理が進行中です。しばらくお待ちください。</p>" +
+                    "<p>進捗情報: " + data.progress + "</p>";
                 // 最終ブログ生成完了のメッセージを確認して自動リロード
                 if (data.progress.includes("最終テックブログの生成が完了しました")) {
                     clearInterval(finalPollingInterval);
