@@ -269,11 +269,9 @@ final_blog_prompt_template = PromptTemplate(
 - 記事は、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた構成で、各章には取り上げる話題と対応するコードブロック（対象ファイルのコードブロックそのもの）のリストが含まれていること。
 - コードブロックは省略せず、完全な内容を示してください。
 - テックブログの読者は処理の流れにへの興味が強いため、処理の流れと対応するコードブロックの説明のボリュームを多くしてください。
-- 各項の文字数は、コードを除いて100文字以上必要です。100-500文字程度にしてください
+- ブログ記事以外の出力は禁止です。補足的な説明等も処理の邪魔になるため、記述しないでください。
 - アウトプットが長くなった場合、分割して出力してください。省略は禁止です。
 - 分割する場合、最後に[続く]というマーカーで終了する必要があります。
-- [続く]マーカーは必ずそのコードブロックを終了するための ``` よりも後に記載し、[続く]のマーカーで終了する必要があります
-- ブログ記事以外の出力は禁止です。補足的な説明等も処理の邪魔になるため、記述しないでください。
 """
 )
 
@@ -390,7 +388,9 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
 ###############################################################################
 # バックグラウンド処理関数（最終ブログ生成）
 ###############################################################################
-def get_full_blog(llm, initial_response, params, progress_id, max_iterations=5):
+import re
+
+def get_full_blog(llm, initial_response, params, progress_id, max_iterations=10):
     """
     これまでのブログ生成結果(initial_response)に加え、ブログ生成に使用した
     すべての情報をプロンプトに含めて、続きを取得する。
@@ -403,43 +403,90 @@ def get_full_blog(llm, initial_response, params, progress_id, max_iterations=5):
     blog_outline = result_store.get(progress_id + "_outline", "")
     
     full_blog = initial_response
+    # マーカーのパターンを正規表現で定義
+    # 以下のパターンにマッチ:
+    # [続く]
+    # [続く]```   （空白があってもOK）
+    # [続く]
+    # ```         （改行があってもOK）
+    marker_pattern = re.compile(r"\[続く\](?:\s*```)?(?:\n```)?\s*$")
+    
     for _ in range(max_iterations):
-        if not full_blog.strip().endswith("[続く]"):
+        # 正規表現でマーカーが末尾にあるか確認
+        if not marker_pattern.search(full_blog):
             break
 
+        progress_store[progress_id] += "分割された出力を生成中...\n"
+
         # すべての入力情報とこれまでの出力内容を含む継続プロンプトを作成
-        context_prompt = (
-            "以下は最終テックブログ記事生成に使用された全ての情報です。\n\n"
-            "【ディレクトリ構造】:\n"
-            f"{directory_tree}\n\n"
-            "【ファイルの役割概要】:\n"
-            f"{file_roles}\n\n"
-            "【詳細なコード解説】:\n"
-            f"{detailed_code_analysis}\n\n"
-            "【全ファイル内容】:\n"
-            f"{project_files_content}\n\n"
-            "【ブログアウトライン】:\n"
-            f"{blog_outline}\n\n"
-            "【その他のパラメータ】:\n"
-            f"GitHubリポジトリURL: {params.get('github_url', '')}\n"
-            f"想定読者: {params.get('target_audience', '')}\n"
-            f"トーン: {params.get('blog_tone', '')}\n"
-            f"追加リクエスト: {params.get('additional_requirements', '')}\n"
-            f"解説言語: {params.get('language', '')}\n\n"
-            "以下はこれまでに生成されたブログ記事の内容です:\n"
-            f"{full_blog}\n\n"
-            "上記の文脈に基づいて、ブログ記事の続きを出力してください。"
-            "コードブロックが途中で切れている場合は、必ず正しく閉じた上で続きを出力し、"
-            "出力が分割される場合は必ず末尾に[続く]マーカーを付けてください。"
+        context_prompt = PromptTemplate(
+            input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "project_files_content", "github_url", "target_audience", "blog_tone", "additional_requirements", "language", "blog_outline", "full_blog"],
+            template="""
+途中まで生成されたブログ記事と、そのブログ生成に使用したプロンプト情報を提供します。
+ブログ記事とプロンプト情報を基に、続きを生成してください。
+
+ブログ記事:
+{full_blog}
+
+プロンプト:
+####################################################################################################
+あなたは有能なソフトウェアエンジニア兼テックライターです。
+
+以下の情報と、事前に確定したアウトラインを基に、最終的なテックブログ記事を{language}で作成してください。
+
+【事前に確定したアウトライン】
+{blog_outline}
+
+【その他のコンテキスト】
+1) **ディレクトリ構造**:  
+{directory_tree}
+
+2) **ファイルの役割概要**:  
+{file_roles}
+
+3) **詳細なコード解説**:  
+{detailed_code_analysis}
+
+4) **全ファイル内容**:  
+{project_files_content}
+
+【追加情報】
+- GitHubリポジトリURL: {github_url}
+- 想定読者: {target_audience}
+- トーン: {blog_tone}
+- その他リクエスト: {additional_requirements}
+
+【出力要件】
+- アウトラインに沿って、読みやすいMarkdown形式の記事を作成してください。
+- 記事は、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた構成で、各章には取り上げる話題と対応するコードブロック（対象ファイルのコードブロックそのもの）のリストが含まれていること。
+- コードブロックは省略せず、完全な内容を示してください。
+- テックブログの読者は処理の流れにへの興味が強いため、処理の流れと対応するコードブロックの説明のボリュームを多くしてください。
+- ブログ記事以外の出力は禁止です。補足的な説明等も処理の邪魔になるため、記述しないでください。
+- アウトプットが長くなった場合、分割して出力してください。省略は禁止です。
+- 分割する場合、最後に[続く]というマーカーで終了する必要があります。
+####################################################################################################
+"""
+        ).format(
+            directory_tree=directory_tree,
+            file_roles=file_roles,
+            detailed_code_analysis=detailed_code_analysis,
+            project_files_content=project_files_content,
+            github_url=params.get("github_url", ""),
+            target_audience=params.get("target_audience", ""),
+            blog_tone=params.get("blog_tone", ""),
+            additional_requirements=params.get("additional_requirements", ""),
+            language=params.get("language", ""),
+            blog_outline=blog_outline,
+            full_blog=full_blog
         )
         next_chunk = llm.predict(context_prompt)
-        # [続く]マーカーを削除して次のチャンクを追加
-        full_blog = full_blog.replace("[続く]", "") + next_chunk
+        # マーカーのパターンにマッチする部分を削除して次のチャンクを追加
+        full_blog = marker_pattern.sub("", full_blog) + next_chunk
     return full_blog
 
 def process_final_blog(progress_id, params):
     try:
-        progress_store[progress_id] += "Step 6: 最終テックブログ生成処理を開始します。\n"
+        progress_store[progress_id] += "Step 6: 最終テックブログ生成中...\n"
         llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
         final_chain = LLMChain(llm=llm, prompt=final_blog_prompt_template)
         
