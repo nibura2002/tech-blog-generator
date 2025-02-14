@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <title>Tech Blog Generator</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pygments.css') }}">
 </head>
 <body>
     <div class="container">
@@ -44,7 +45,6 @@
 
         <!-- メインコンテンツ -->
         <main class="main-content">
-            <h1>Tech Blog Generator</h1>
             {% with messages = get_flashed_messages(category_filter=["error", "info", "warning"]) %}
               {% if messages %}
                 <ul class="flashes">
@@ -54,14 +54,34 @@
                 </ul>
               {% endif %}
             {% endwith %}
-            <div id="progress">進捗情報をここに表示します…</div>
+
+            {% if blog_markdown %}
+                <h1>ブログ確認</h1>
+                <form id="blogForm" method="POST">
+                    <textarea name="edited_markdown" rows="25" cols="100">{{ blog_markdown|e }}</textarea>
+                    <br><br>
+                    <button type="button" onclick="submitBlog()">プレビューを更新</button>
+                </form>
+                <hr>
+                <h2>プレビュー (Markdown → HTML)</h2>
+                <div id="preview-container">{{ converted_html|safe }}</div>
+                <br>
+                <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
+            {% elif blog_outline %}
+                <h1>アウトライン確認</h1>
+                <form id="outlineForm">
+                    <textarea name="edited_outline" rows="20" cols="100">{{ blog_outline|e }}</textarea>
+                    <br><br>
+                    <button type="button" id="generateButton" onclick="submitOutline()">このアウトラインで最終ブログを生成</button>
+                    <div id="progress">進捗情報をここに表示します…</div>
+                </form>
+            {% else %}
+                <h1>Tech Blog Generator</h1>
+                <div id="progress">進捗情報をここに表示します…</div>
+            {% endif %}
         </main>
     </div>
-    <footer>
-        <a href="{{ url_for('index') }}">最初の画面</a> |
-        <a href="{{ url_for('preview_outline') }}">アウトライン確認</a> |
-        <a href="{{ url_for('preview_blog') }}">ブログ確認</a>
-    </footer>
+    <footer></footer>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

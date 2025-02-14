@@ -35,7 +35,7 @@
                     </select>
                 </label>
                 <br><br>
-                <label>その他リクエスト:
+                <label>その他リクエスト:<br>
                     <textarea name="additional_requirements" rows="3"></textarea>
                 </label>
                 <br><br>
@@ -69,12 +69,9 @@
 
         <!-- フッターにページ遷移用のリンクを追加 -->
         <footer>
-            <a href="{{ url_for('index') }}">最初の画面</a> |
-            <a href="{{ url_for('preview_outline') }}">アウトライン確認</a> |
-            <a href="{{ url_for('preview_blog') }}">ブログ確認</a>
         </footer>        
     </div>
-    <!-- main.js を読み込む -->
+    <!-- main.js を読み込む（main.js 内で SSE の開始処理を実施） -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

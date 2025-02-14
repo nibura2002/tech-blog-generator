@@ -7,9 +7,10 @@ import threading
 import uuid
 import markdown
 import json
+import time
 
 from dotenv import load_dotenv
-from flask import Flask, request, render_template, redirect, url_for, flash, send_file, session, jsonify
+from flask import Flask, request, render_template, redirect, url_for, flash, send_file, session, jsonify, Response, stream_with_context
 from werkzeug.utils import secure_filename
 
 # LangChain & OpenAI imports
@@ -374,6 +375,8 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
             "additional_requirements": additional_requirements,
             "language": language
         })
+        logger.info("Blog outline generated.")
+
         result_store[progress_id + "_outline"] = blog_outline
         progress_store[progress_id] += "ブログアウトラインの生成が完了しました。\n"
 
@@ -382,6 +385,8 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
         result_store[progress_id + "_roles"] = file_roles
         result_store[progress_id + "_analysis"] = detailed_code_analysis
         result_store[progress_id + "_files"] = project_files_content
+
+        logger.info("Project analysis completed.")
 
     except Exception as e:
         progress_store[progress_id] += f"処理中にエラー発生: {e}\n"
@@ -392,11 +397,6 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
 import re
 
 def get_full_blog(llm, initial_response, params, progress_id, max_iterations=10):
-    """
-    これまでのブログ生成結果(initial_response)に加え、ブログ生成に使用した
-    すべての情報をプロンプトに含めて、続きを取得する。
-    """
-    # 各入力情報を取得
     directory_tree = result_store.get(progress_id + "_tree", "")
     file_roles = result_store.get(progress_id + "_roles", "")
     detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
@@ -404,22 +404,14 @@ def get_full_blog(llm, initial_response, params, progress_id, max_iterations=10)
     blog_outline = result_store.get(progress_id + "_outline", "")
     
     full_blog = initial_response
-    # マーカーのパターンを正規表現で定義
-    # 以下のパターンにマッチ:
-    # <<<CONTINUE>>>
-    # <<<CONTINUE>>>```   （空白があってもOK）
-    # <<<CONTINUE>>>
-    # ```         （改行があってもOK）
     marker_pattern = re.compile(r"<{1,4}CONTINUE>{1,4}(?:\s*```)?(?:\n```)?\s*$", re.IGNORECASE)
     
     for _ in range(max_iterations):
-        # 正規表現でマーカーが末尾にあるか確認
         if not marker_pattern.search(full_blog):
             break
 
         progress_store[progress_id] += "分割された出力を生成中...\n"
 
-        # すべての入力情報とこれまでの出力内容を含む継続プロンプトを作成
         context_prompt = PromptTemplate(
             input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "project_files_content", "github_url", "target_audience", "blog_tone", "additional_requirements", "language", "blog_outline", "full_blog"],
             template="""
@@ -481,8 +473,9 @@ def get_full_blog(llm, initial_response, params, progress_id, max_iterations=10)
             full_blog=full_blog
         )
         next_chunk = llm.predict(context_prompt)
-        # マーカーのパターンにマッチする部分を削除して次のチャンクを追加
         full_blog = marker_pattern.sub("", full_blog) + next_chunk
+        full_blog = strip_code_fences(full_blog)
+
     return full_blog
 
 def process_final_blog(progress_id, params):
@@ -491,7 +484,6 @@ def process_final_blog(progress_id, params):
         llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
         final_chain = LLMChain(llm=llm, prompt=final_blog_prompt_template)
         
-        # 最初のレスポンスを取得
         initial_response = final_chain.run({
             "directory_tree": result_store.get(progress_id + "_tree", ""),
             "file_roles": result_store.get(progress_id + "_roles", ""),
@@ -505,7 +497,6 @@ def process_final_blog(progress_id, params):
             "blog_outline": result_store.get(progress_id + "_outline", "")
         })
         
-        # もし最初のレスポンスが途中で切れていたら追加入力して続きを取得
         full_blog = get_full_blog(llm, initial_response, params, progress_id)
         
         result_store[progress_id] = full_blog
@@ -513,163 +504,28 @@ def process_final_blog(progress_id, params):
     except Exception as e:
         progress_store[progress_id] += f"最終テックブログ生成中にエラーが発生しました: {e}\n"
 
-
 ###############################################################################
-# アウトライン生成
+# SSE 用の進捗更新エンドポイント
 ###############################################################################
-@app.route("/generate_outline", methods=["GET"])
-def generate_outline():
-    progress_id = session.get("progress_id", None)
-
-    if not progress_id:
-        flash("progress_idがありません。", "error")
-        return redirect(url_for("index"))
-
-    directory_tree = result_store.get(progress_id + "_tree", "")
-    file_roles = result_store.get(progress_id + "_roles", "")
-    detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
-    project_files_content = result_store.get(progress_id + "_files", "")
-    params = get_common_params_from_args()
-    try:
-        llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
-        outline_chain = LLMChain(llm=llm, prompt=blog_outline_prompt_template)
-        blog_outline = outline_chain.run({
-            "directory_tree": directory_tree,
-            "file_roles": file_roles,
-            "detailed_code_analysis": detailed_code_analysis,
-            "project_files_content": project_files_content,
-            "github_url": params["github_url"],
-            "target_audience": params["target_audience"],
-            "blog_tone": params["blog_tone"],
-            "additional_requirements": params["additional_requirements"],
-            "language": params["language"]
-        })
-        result_store[progress_id + "_outline"] = blog_outline
-        progress_store[progress_id] += "\nブログアウトラインの生成が完了しました。\n"
-        flash("ブログアウトラインを生成しました。", "info")
-        return redirect(url_for("preview_outline"))
-    except Exception as e:
-        flash(f"アウトライン生成中にエラーが発生しました: {e}", "error")
-        return redirect(url_for("index"))
-
-###############################################################################
-# アウトラインのプレビュー＆編集
-###############################################################################
-@app.route("/preview_outline", methods=["GET", "POST"])
-def preview_outline():
+@app.route('/progress_stream')
+def progress_stream():
     progress_id = session.get("progress_id", None)
     if not progress_id:
-        flash("progress_idがありません。", "error")
-        return redirect(url_for("index"))
+        return Response("data: {\"progress\": \"進捗情報がありません。\"}\n\n", mimetype="text/event-stream")
 
-    outline_key = progress_id + "_outline"
-    if request.method == "POST":
-        edited_outline = request.form.get("edited_outline", "")
-        result_store[outline_key] = edited_outline
-        return redirect(url_for("generate_final_blog"))
-
-    blog_outline = result_store.get(outline_key, "まだアウトラインが生成されていません。")
-    return render_template("preview_outline.html", blog_outline=blog_outline)
-
-###############################################################################
-# 最終ブログ生成
-###############################################################################
-@app.route("/generate_final_blog", methods=["GET", "POST"])
-def generate_final_blog():
-    progress_id = session.get("progress_id", None)
-    if not progress_id:
-        flash("progress_idがありません。", "error")
-        return redirect(url_for("index"))
-    
-    if request.method == "POST":
-        params = get_common_params_from_args()
-        # バックグラウンドで最終ブログ生成処理を開始
-        if "最終テックブログの生成が開始しました" not in progress_store[progress_id]:
-            progress_store[progress_id] += "最終テックブログの生成が開始しました。\n"
-            threading.Thread(
-                target=process_final_blog,
-                args=(progress_id, params),
-                daemon=True
-            ).start()
-        # 即時に処理開始レスポンスを返す
-        return jsonify({"status": "最終テックブログ生成開始"}), 200
-
-    # GETの場合はシンプルな案内ページを表示（必要に応じて実装）
-    return render_template("generate_final_blog.html")
+    def event_stream():
+        while True:
+            progress_info = progress_store.get(progress_id, "処理が開始されていません。")
+            data = json.dumps({"progress": progress_info})
+            yield f"data: {data}\n\n"
+            if "最終テックブログの生成が完了しました" in progress_info:
+                break
+            time.sleep(3)
+    return Response(stream_with_context(event_stream()), mimetype="text/event-stream")
 
 ###############################################################################
-# メインフロー: index → process_project → ...
+# Markdownダウンロード
 ###############################################################################
-@app.route("/", methods=["GET", "POST"])
-def index():
-    if request.method == "POST":
-        params = get_common_params_from_form()
-        progress_id = str(uuid.uuid4())
-        session["progress_id"] = progress_id
-        progress_store[progress_id] = "処理を開始します...\n"
-
-        github_url = params["github_url"]
-        uploaded_files = request.files.getlist("project_folder")
-        if not ((uploaded_files and len(uploaded_files) > 0) or github_url):
-            flash("GithubリポジトリのURLまたはフォルダを指定してください。", "error")
-            return redirect(url_for("index"))
-
-        target_audience = params["target_audience"]
-        blog_tone = params["blog_tone"]
-        additional_requirements = params["additional_requirements"]
-        language = params["language"]
-
-        temp_project_dir = tempfile.mkdtemp()
-        if uploaded_files and len(uploaded_files) > 0:
-            for file in uploaded_files:
-                filename = file.filename
-                if not filename:
-                    continue
-                dest_path = os.path.join(temp_project_dir, filename)
-                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-                file.save(dest_path)
-
-        threading.Thread(
-            target=process_project,
-            args=(progress_id, github_url, target_audience, blog_tone, additional_requirements, language, temp_project_dir),
-            daemon=True
-        ).start()
-
-        flash("プロジェクト解析を開始しました。しばらくお待ちください。", "info")
-        return render_template("index.html", progress_id=progress_id)
-
-    return render_template("index.html")
-
-@app.route("/progress", methods=["GET"])
-def progress():
-    """
-    現在の進捗状況を返すエンドポイント
-    """
-    progress_id = session.get("progress_id", None)
-    
-    if not progress_id:
-        return jsonify({"progress": "進捗情報がありません。"}), 404
-
-    # progress_store に progress_id がない場合も 404 を返さず、適切な初期値を返す
-    progress_info = progress_store.get(progress_id, "処理が開始されていません。")
-    
-    return jsonify({"progress": progress_info})
-
-@app.route("/preview_blog", methods=["GET", "POST"])
-def preview_blog():
-    if request.method == "POST":
-        edited_markdown = request.form.get("edited_markdown", "")
-        result_store[session.get("progress_id")] = edited_markdown
-        return redirect(url_for("preview_blog"))
-    progress_id = session.get("progress_id", None)
-    blog_markdown = result_store.get(progress_id, "")
-    converted_html = markdown.markdown(blog_markdown, extensions=['fenced_code', 'codehilite'])
-    progress_log = progress_store.get(progress_id, "進捗情報はありません。")
-    return render_template("preview.html",
-                           blog_markdown=blog_markdown,
-                           converted_html=converted_html,
-                           progress_log=progress_log)
-
 @app.route("/download_markdown", methods=["GET"])
 def download_markdown():
     progress_id = session.get("progress_id", None)
@@ -681,6 +537,105 @@ def download_markdown():
         tmp_file.write(blog_markdown.encode("utf-8"))
         tmp_file_name = tmp_file.name
     return send_file(tmp_file_name, as_attachment=True, download_name="tech_blog.md", mimetype="text/markdown")
+
+###############################################################################
+# メインフロー: すべてを index.html で実装（POST送信で処理の種類を判別）
+###############################################################################
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == "POST":
+        # ブログ本文更新（アウトプット編集）時
+        if "edited_markdown" in request.form:
+            progress_id = session.get("progress_id", None)
+            if not progress_id:
+                flash("進捗IDがありません。", "error")
+                return redirect(url_for("index"))
+            edited_markdown = request.form.get("edited_markdown", "")
+            result_store[progress_id] = edited_markdown
+            flash("ブログが更新されました。", "info")
+            return redirect(url_for("index"))
+        # アウトライン更新時
+        elif "edited_outline" in request.form:
+            progress_id = session.get("progress_id", None)
+            if not progress_id:
+                flash("進捗IDがありません。", "error")
+                return redirect(url_for("index"))
+            edited_outline = request.form.get("edited_outline", "")
+            result_store[progress_id + "_outline"] = edited_outline
+            flash("アウトラインが更新されました。", "info")
+            return redirect(url_for("index"))
+        else:
+            # プロジェクト送信の場合
+            params = get_common_params_from_form()
+            progress_id = str(uuid.uuid4())
+            session["progress_id"] = progress_id
+            session["params"] = params  # 後で最終ブログ生成に利用
+            progress_store[progress_id] = "処理を開始します...\n"
+
+            github_url = params["github_url"]
+            uploaded_files = request.files.getlist("project_folder")
+            if not ((uploaded_files and len(uploaded_files) > 0) or github_url):
+                flash("GithubリポジトリのURLまたはフォルダを指定してください。", "error")
+                return redirect(url_for("index"))
+
+            target_audience = params["target_audience"]
+            blog_tone = params["blog_tone"]
+            additional_requirements = params["additional_requirements"]
+            language = params["language"]
+
+            temp_project_dir = tempfile.mkdtemp()
+            if uploaded_files and len(uploaded_files) > 0:
+                for file in uploaded_files:
+                    filename = file.filename
+                    if not filename:
+                        continue
+                    dest_path = os.path.join(temp_project_dir, filename)
+                    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                    file.save(dest_path)
+
+            threading.Thread(
+                target=process_project,
+                args=(progress_id, github_url, target_audience, blog_tone, additional_requirements, language, temp_project_dir),
+                daemon=True
+            ).start()
+
+            flash("プロジェクト解析を開始しました。しばらくお待ちください。", "info")
+            return render_template("index.html", progress_id=progress_id, progress_log=progress_store[progress_id])
+    else:
+        progress_id = session.get("progress_id", None)
+        blog_markdown = ""
+        blog_outline = ""
+        converted_html = ""
+        progress_log = ""
+        if progress_id:
+            blog_markdown = result_store.get(progress_id, "")
+            blog_outline = result_store.get(progress_id + "_outline", "")
+            progress_log = progress_store.get(progress_id, "進捗情報はありません。")
+            converted_html = markdown.markdown(blog_markdown, extensions=['fenced_code', 'codehilite'])
+        return render_template("index.html",
+                               progress_id=progress_id,
+                               blog_markdown=blog_markdown,
+                               blog_outline=blog_outline,
+                               converted_html=converted_html,
+                               progress_log=progress_log)
+
+###############################################################################
+# 最終ブログ生成（POSTのみ）
+###############################################################################
+@app.route("/generate_final_blog", methods=["POST"])
+def generate_final_blog():
+    progress_id = session.get("progress_id", None)
+    if not progress_id:
+        return jsonify({"error": "progress_idがありません。"}), 400
+    params = session.get("params", {})
+    if "最終テックブログの生成が開始しました" not in progress_store[progress_id]:
+        progress_store[progress_id] += "最終テックブログの生成が開始しました。\n"
+        threading.Thread(
+            target=process_final_blog,
+            args=(progress_id, params),
+            daemon=True
+        ).start()
+    return jsonify({"status": "最終テックブログ生成開始"}), 200
 
 ###############################################################################
 # Run the Flask App
