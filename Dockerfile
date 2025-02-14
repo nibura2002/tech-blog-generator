@@ -21,6 +21,9 @@ RUN poetry config virtualenvs.create false && \
 # Remove build dependencies to reduce the final image size
 RUN apt-get purge -y --auto-remove build-essential && rm -rf /var/lib/apt/lists/*
 
+# Install Git
+RUN apt-get update && apt-get install -y git
+
 # Copy the application source code
 COPY . /app
 
