@@ -79,7 +79,6 @@
                     <textarea name="edited_outline" rows="20" cols="100">{{ blog_outline|e }}</textarea>
                     <br><br>
                     <button type="button" id="generateButton" onclick="submitOutline()">このアウトラインで最終ブログを生成</button>
-                    <div id="processingMessage" style="display:none; margin-top:10px; color: blue;"></div>
                 </form>
             {% elif viewType == "status" %}
                 <!-- ブログ生成ステータス画面：SSE 起動中 -->
