@@ -236,7 +236,8 @@ def process_project(
         update_progress(progress_id, "Step 3: 各ファイルの役割を要約中...\n")
         llm = ChatOpenAI(model_name="o3-mini", openai_api_key=openai_api_key)
         file_role_chain = file_role_prompt_template | llm
-        file_roles = file_role_chain.invoke({"directory_tree": directory_tree})
+        file_roles = file_role_chain.invoke(
+            {"directory_tree": directory_tree}).content
         update_progress(progress_id, "各ファイルの役割要約完了。\n")
         logger.info("File roles summary obtained.")
 
@@ -284,7 +285,7 @@ def process_project(
                     "file_path": relative_file_path,
                     "file_content": file_content,
                     "language": language
-                })
+                }).content
                 detailed_code_analysis += f"\n\n## {relative_file_path}\n" + file_detail
             except Exception as e:
                 update_progress(progress_id,
@@ -314,7 +315,7 @@ def process_project(
             "blog_tone": blog_tone,
             "additional_requirements": additional_requirements,
             "language": language
-        })
+        }).content
         logger.info("Blog outline generated.")
         result_store[progress_id + "_outline"] = blog_outline
         update_progress(progress_id, "ブログアウトラインの生成が完了しました。\n")
@@ -390,11 +391,11 @@ def process_final_blog(progress_id, params):
             "additional_requirements": params["additional_requirements"],
             "language": params["language"],
             "blog_outline": result_store.get(progress_id + "_outline", "")
-        })
+        }).content
 
         full_blog = get_full_blog(llm, initial_response, params, progress_id)
 
-        result_store[progress_id] = full_blog
+        result_store[progress_id] = full_blog.content
         update_progress(progress_id, "最終テックブログの生成が完了しました。\n")
         logger.info("process_final_blog 完了: progress_id=%s", progress_id)
     except Exception as e:
