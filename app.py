@@ -13,6 +13,16 @@ from dotenv import load_dotenv
 from flask import Flask, request, render_template, redirect, url_for, flash, send_file, session, jsonify, Response, stream_with_context
 from werkzeug.utils import secure_filename
 
+
+# LLM用プロンプトのインポート
+from const.prompt import (
+    file_role_prompt_template,
+    code_detail_prompt_template,
+    blog_outline_prompt_template,
+    final_blog_prompt_template,
+    context_blog_prompt_template
+)
+
 # LangChain & OpenAI imports
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
@@ -164,138 +174,6 @@ def strip_code_fences(text: str) -> str:
     return text
 
 ###############################################################################
-# PromptTemplates
-###############################################################################
-file_role_prompt_template = PromptTemplate(
-    input_variables=["directory_tree"],
-    template="""
-以下のディレクトリ構造を見て、各ファイルの役割を簡潔にまとめてください。
-
-ディレクトリ構造:
-{directory_tree}
-"""
-)
-
-code_detail_prompt_template = PromptTemplate(
-    input_variables=["file_content", "file_path", "language"],
-    template="""
-# ファイル名: {file_path}
-
-以下はファイル「{file_path}」の完全なコードです。  
-解説は {language} で行ってください。  
-
-【出力フォーマット】  
-以下の JSON 形式に従って出力してください。  
-出力例:  
-{{
-  "sections": [
-    {{
-      "id": "section_1",
-      "title": "ここに機能の名前またはセクションのタイトル",
-      "description": "この機能の目的、処理の流れ、設計意図、エラーハンドリングについて記述してください。",
-      "code_block": "この機能に対応するコード全体"
-    }},
-    {{
-      "id": "section_2",
-      "title": "別の機能やセクションのタイトル",
-      "description": "その機能の詳細な解説を記述してください。",
-      "code_block": "該当するコード全体"
-    }}
-  ]
-}}
-
-【注意事項】  
-- 出力は必ず上記の JSON 形式に従ってください。  
-- 各セクションには一意の識別子（例: section_1, section_2, ...）を付与してください。  
-- code_block には、そのセクションに対応するコードブロック全体を記述してください。省略は禁止です。
-- JSON 形式以外の出力は一切行わないでください。
-
-以下、対象ファイルのコードです:
-{file_content}
-"""
-)
-
-blog_outline_prompt_template = PromptTemplate(
-    input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "project_files_content", "github_url", "target_audience", "blog_tone", "additional_requirements", "language"],
-    template="""
-あなたは有能なソフトウェアエンジニア兼テックライターです。  
-以下のコンテキスト情報を基に、テックブログの章立て（アウトライン）を考案してください。
-
-【コンテキスト】
-1) **ディレクトリ構造**:  
-{directory_tree}
-
-2) **ファイルの役割概要**:  
-{file_roles}
-
-3) **詳細なコード解説**:  
-{detailed_code_analysis}
-
-※ 注意: 上記「詳細なコード解説」は、各機能ごとに一意の識別子を付与した JSON 形式で出力されています。  
-アウトライン作成時は、対応するコードブロックを参照する際に、各セクションの識別子（例: section_1, section_2, …）を必ず記載してください。
-
-4) **全ファイル内容** (参考用):  
-{project_files_content}
-
-【追加情報】
-- GitHubリポジトリURL: {github_url}
-- 想定読者: {target_audience}
-- トーン: {blog_tone}
-- その他リクエスト: {additional_requirements}
-- 解説言語: {language}
-
-【出力要件】
-- ブログ全体のアウトラインを、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた形式で箇条書きしてください。
-- 各章・節には、取り上げる話題および対応するコードブロック（上記「詳細なコード解説」で出力された JSON の識別子を参照する形）を必ず示してください。
-- Markdown 形式で出力してください。
-- 補足的な説明等は記述しないでください。
-"""
-)
-
-final_blog_prompt_template = PromptTemplate(
-    input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "project_files_content", "github_url", "target_audience", "blog_tone", "additional_requirements", "language", "blog_outline"],
-    template="""
-あなたは有能なソフトウェアエンジニア兼テックライターです。
-
-以下の情報と、事前に確定したアウトラインを基に、最終的なテックブログ記事を{language}で作成してください。
-
-【事前に確定したアウトライン】
-{blog_outline}
-
-【その他のコンテキスト】
-1) **ディレクトリ構造**:  
-{directory_tree}
-
-2) **ファイルの役割概要**:  
-{file_roles}
-
-3) **詳細なコード解説**:  
-{detailed_code_analysis}
-
-※ 注意: 上記「詳細なコード解説」は、各機能ごとに一意の識別子を付与した JSON 形式で出力されています。  
-各セクションの識別子（例: section_1, section_2, …）を参照して、対応するコードブロックを記事に追加してください。
-
-4) **全ファイル内容**:  
-{project_files_content}
-
-【追加情報】
-- GitHubリポジトリURL: {github_url}
-- 想定読者: {target_audience}
-- トーン: {blog_tone}
-- その他リクエスト: {additional_requirements}
-
-【出力要件】
-- アウトラインに沿って、読みやすいMarkdown形式の記事を作成してください。
-- 記事は、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた構成で、各章には取り上げる話題と対応するコードブロック（対象ファイルのコードブロックそのもの）のリストが含まれていること。
-- コードブロックは省略せず、完全な内容を示してください。
-- テックブログの読者は処理の流れにへの興味が強いため、処理の流れと対応するコードブロックの説明のボリュームを多くしてください。
-- ブログ記事以外の出力は禁止です。補足的な説明等も処理の邪魔になるため、記述しないでください。
-- アウトプットが長くなった場合、分割して出力してください。省略は禁止です。
-- 分割する場合、最後に<<<CONTINUE>>>というマーカーで終了する必要があります。
-"""
-)
-
-###############################################################################
 # バックグラウンド処理関数（プロジェクト解析）
 ###############################################################################
 def process_project(progress_id, github_url, target_audience, blog_tone, additional_requirements, language, temp_project_dir):
@@ -407,6 +285,7 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
 ###############################################################################
 # バックグラウンド処理関数（最終ブログ生成）
 ###############################################################################
+
 def get_full_blog(llm, initial_response, params, progress_id, max_iterations=10):
     directory_tree = result_store.get(progress_id + "_tree", "")
     file_roles = result_store.get(progress_id + "_roles", "")
@@ -422,55 +301,9 @@ def get_full_blog(llm, initial_response, params, progress_id, max_iterations=10)
             break
 
         update_progress(progress_id, "分割された出力を生成中...\n")
-
-        context_prompt = PromptTemplate(
-            input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "project_files_content", "github_url", "target_audience", "blog_tone", "additional_requirements", "language", "blog_outline", "full_blog"],
-            template="""
-途中まで生成されたブログ記事と、そのブログ生成に使用したプロンプト情報を提供します。
-ブログ記事とプロンプト情報を基に、続きを生成してください。
-
-ブログ記事:
-{full_blog}
-
-プロンプト:
-####################################################################################################
-あなたは有能なソフトウェアエンジニア兼テックライターです。
-
-以下の情報と、事前に確定したアウトラインを基に、最終的なテックブログ記事を{language}で作成してください。
-
-【事前に確定したアウトライン】
-{blog_outline}
-
-【その他のコンテキスト】
-1) **ディレクトリ構造**:  
-{directory_tree}
-
-2) **ファイルの役割概要**:  
-{file_roles}
-
-3) **詳細なコード解説**:  
-{detailed_code_analysis}
-
-4) **全ファイル内容**:  
-{project_files_content}
-
-【追加情報】
-- GitHubリポジトリURL: {github_url}
-- 想定読者: {target_audience}
-- トーン: {blog_tone}
-- その他リクエスト: {additional_requirements}
-
-【出力要件】
-- アウトラインに沿って、読みやすいMarkdown形式の記事を作成してください。
-- 記事は、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた構成で、各章には取り上げる話題と対応するコードブロック（対象ファイルのコードブロックそのもの）のリストが含まれていること。
-- コードブロックは省略せず、完全な内容を示してください。
-- テックブログの読者は処理の流れにへの興味が強いため、処理の流れと対応するコードブロックの説明のボリュームを多くしてください。
-- ブログ記事以外の出力は禁止です。補足的な説明等も処理の邪魔になるため、記述しないでください。
-- アウトプットが長くなった場合、分割して出力してください。省略は禁止です。
-- 分割する場合、最後に<<<CONTINUE>>>というマーカーで終了する必要があります。
-####################################################################################################
-"""
-        ).format(
+        
+        # context_blog_prompt_template を利用して、プロンプトの内容を生成
+        context_prompt = context_blog_prompt_template.format(
             directory_tree=directory_tree,
             file_roles=file_roles,
             detailed_code_analysis=detailed_code_analysis,
