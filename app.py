@@ -23,6 +23,9 @@ from const.prompt import (
     context_blog_prompt_template
 )
 
+# Disallowed file extensionsのインポート
+from const.const import DISALLOWED_EXTENSIONS, MAX_FILE_SIZE, MAX_FILE_LENGTH, IGNORED_DIRECTORIES, DEFAULT_ENCODING
+
 # LangChain & OpenAI imports
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
@@ -125,23 +128,13 @@ def get_common_params_from_args():
 def read_project_files(root_dir):
     logger.info("Reading project files from: %s", root_dir)
     all_text = []
-    max_size = 20 * 1024 * 1024  # 20MB
-    max_chars = 20000
-    disallowed_extensions = (
-        ".lock",
-        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".tiff", ".ico",
-        ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv",
-        ".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a",
-        ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz",
-        ".exe", ".dll", ".so", ".bin", ".app", ".msi", ".deb", ".rpm",
-        ".ttf", ".otf", ".woff", ".woff2",
-        ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"
-    )
+    MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
+    MAX_FILE_LENGTH = 20000
     for dirpath, dirnames, filenames in os.walk(root_dir):
-        dirnames[:] = [d for d in dirnames if "__pycache__" not in d]
+        dirnames[:] = [d for d in dirnames if d not in IGNORED_DIRECTORIES]
         for file in filenames:
             file_path = os.path.join(dirpath, file)
-            if file.lower().endswith(disallowed_extensions):
+            if file.lower().endswith(DISALLOWED_EXTENSIONS):
                 logger.info("Skipping disallowed file: %s", file_path)
                 continue
             if "__pycache__" in file_path:
@@ -149,7 +142,7 @@ def read_project_files(root_dir):
                 continue
             try:
                 size = os.path.getsize(file_path)
-                if size > max_size:
+                if size > MAX_FILE_SIZE:
                     logger.info(
                         "Skipping large file (>20MB): %s (size=%d bytes)",
                         file_path,
@@ -160,9 +153,9 @@ def read_project_files(root_dir):
                     "Could not determine file size for %s: %s", file_path, e)
                 continue
             try:
-                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(file_path, "r", encoding=DEFAULT_ENCODING, errors="ignore") as f:
                     content = f.read()
-                if len(content) > max_chars:
+                if len(content) > MAX_FILE_LENGTH:
                     logger.info(
                         "Skipping file due to excessive length (>20000 chars): %s (length=%d)",
                         file_path,
@@ -225,7 +218,7 @@ def process_project(
                 update_progress(progress_id, "GitHubリポジトリのクローンに失敗しました。\n")
                 logger.error(
                     "GitHub clone failed: %s",
-                    e.output.decode("utf-8"))
+                    e.output.decode(DEFAULT_ENCODING))
                 return
 
         update_progress(progress_id, "Step 2: ディレクトリ構造を取得中...\n")
@@ -244,23 +237,10 @@ def process_project(
         update_progress(progress_id, "Step 4: 各ファイルの詳細なコード解説を取得中...\n")
         detailed_code_analysis = ""
         all_files = []
-        disallowed_extensions = (
-            ".lock", ".gitignore", ".dockerignore", ".npmignore", ".yarnignore",
-            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".tiff", ".ico",
-            ".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv",
-            ".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a",
-            ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz",
-            ".exe", ".dll", ".so", ".bin", ".app", ".msi", ".deb", ".rpm",
-            ".ttf", ".otf", ".woff", ".woff2",
-            ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"
-        )
         for dirpath, dirnames, filenames in os.walk(temp_project_dir):
-            dirnames[:] = [
-                d for d in dirnames if "__pycache__" not in d and ".git" not in d and ".vscode" not in d]
+            dirnames[:] = [d for d in dirnames if d not in IGNORED_DIRECTORIES]
             for file in filenames:
-                if file.lower().endswith(disallowed_extensions):
-                    continue
-                if "__pycache__" in dirpath:
+                if file.lower().endswith(DISALLOWED_EXTENSIONS):
                     continue
                 all_files.append(os.path.join(dirpath, file))
         total_files = len(all_files)
@@ -278,7 +258,7 @@ def process_project(
                 total_files,
                 relative_file_path)
             try:
-                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(file_path, "r", encoding=DEFAULT_ENCODING, errors="ignore") as f:
                     file_content = f.read()
                 code_detail_chain = code_detail_prompt_template | llm
                 file_detail = code_detail_chain.invoke({
@@ -367,7 +347,7 @@ def get_full_blog(
             blog_outline=blog_outline,
             full_blog=full_blog
         )
-        next_chunk = llm.predict(context_prompt)
+        next_chunk = llm.invoke(context_prompt).content
         full_blog = marker_pattern.sub("", full_blog) + next_chunk
 
     return full_blog
@@ -395,7 +375,7 @@ def process_final_blog(progress_id, params):
 
         full_blog = get_full_blog(llm, initial_response, params, progress_id)
 
-        result_store[progress_id] = full_blog.content
+        result_store[progress_id] = full_blog
         update_progress(progress_id, "最終テックブログの生成が完了しました。\n")
         logger.info("process_final_blog 完了: progress_id=%s", progress_id)
     except Exception as e:
@@ -421,7 +401,7 @@ def progress_stream():
             current_history = progress_history.get(progress_id, "進捗情報はありません。")
             data = json.dumps({"progress": current_status,
                               "history": current_history})
-            yield f"data: {data}\n\n".encode("utf-8")
+            yield f"data: {data}\n\n".encode(DEFAULT_ENCODING)
             if (current_status.find("最終テックブログの生成が完了しました") != -1 or
                     current_status.find("ブログアウトラインの生成が完了しました") != -1):
                 break
@@ -442,7 +422,7 @@ def download_markdown():
         flash("ダウンロードするMarkdownがありません。", "error")
         return redirect(url_for("index"))
     with tempfile.NamedTemporaryFile(delete=False, suffix=".md") as tmp_file:
-        tmp_file.write(blog_markdown.encode("utf-8"))
+        tmp_file.write(blog_markdown.encode(DEFAULT_ENCODING))
         tmp_file_name = tmp_file.name
     return send_file(
         tmp_file_name,
