@@ -104,8 +104,6 @@ docker run -e OPENAI_API_KEY=your_api_key_here -p 8501:8080 tech-blog-generator
 ├── .env.example
 └── templates
     ├── index.html
-    ├── preview.html
-    ├── preview_outline.html
 └── static
     ├── css
     │   ├── style.css
