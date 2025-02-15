@@ -1,0 +1,8 @@
+repos:
+  - repo: local
+    hooks:
+      - id: autopep8
+        name: autopep8 formatter
+        entry: autopep8 --in-place --aggressive --aggressive --recursive .
+        language: system
+        types: [python]
