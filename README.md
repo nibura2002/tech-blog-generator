@@ -96,33 +96,25 @@ docker run -e OPENAI_API_KEY=your_api_key_here -p 8501:8080 tech-blog-generator
 ## ディレクトリ構成
 ```bash
 .
+├── Dockerfile
 ├── README.md
 ├── app.py
+├── const
+│   ├── __init__.py
+│   ├── __pycache__
+│   ├── const.py
+│   └── prompt.py
 ├── poetry.lock
 ├── pyproject.toml
-├── Dockerfile
-├── .env.example
+├── static
+│   ├── css
+│   │   ├── pygments.css
+│   │   └── style.css
+│   └── js
+│       └── main.js
 └── templates
-    ├── index.html
-└── static
-    ├── css
-    │   ├── style.css
-    │   ├── pygments.css
-    ├── js
-    │   ├── main.js
+    └── index.html
 ```
-
----
-
-## 注意事項
-- **GitHub リポジトリのクローン時に認証が必要な場合**  
-  GitHub のパーソナルアクセストークン (PAT) を `.env` に追加するか、SSH キー認証を設定してください。
-
-- **解析対象のプロジェクトが大規模な場合**  
-  解析には時間がかかる場合があります。特に大規模なリポジトリを GitHub からクローンする場合、待機時間に注意してください。
-
-- **セキュリティに関する注意**  
-  `.env` には API キーなどの機密情報が含まれるため、`.dockerignore` に `.env` を追加し、リポジトリに含めないようにしてください。
 
 <!-- 以降はテンプレだが不使用のためコメントアウト -->
 <!--
