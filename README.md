@@ -124,6 +124,7 @@ docker run -e OPENAI_API_KEY=your_api_key_here -p 8501:8080 tech-blog-generator
 - **セキュリティに関する注意**  
   `.env` には API キーなどの機密情報が含まれるため、`.dockerignore` に `.env` を追加し、リポジトリに含めないようにしてください。
 
+<!-- 以降はテンプレだが不使用のためコメントアウト -->
 <!--
 ---
 
@@ -140,3 +141,6 @@ docker run -e OPENAI_API_KEY=your_api_key_here -p 8501:8080 tech-blog-generator
 ## お問い合わせ
 ご質問やご意見がありましたら、[your_email@example.com](mailto:your_email@example.com) までご連絡ください。
 -->
+
+<!-- autopep8実行コマンドメモ -->
+<!-- poetry run autopep8 --in-place --aggressive --aggressive --recursive . -->

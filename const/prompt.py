@@ -17,12 +17,12 @@ code_detail_prompt_template = PromptTemplate(
     template="""
 # ファイル名: {file_path}
 
-以下はファイル「{file_path}」の完全なコードです。  
-解説は {language} で行ってください。  
+以下はファイル「{file_path}」の完全なコードです。
+解説は {language} で行ってください。
 
-【出力フォーマット】  
-以下の JSON 形式に従って出力してください。  
-出力例:  
+【出力フォーマット】
+以下の JSON 形式に従って出力してください。
+出力例:
 {{
   "sections": [
     {{
@@ -40,9 +40,9 @@ code_detail_prompt_template = PromptTemplate(
   ]
 }}
 
-【注意事項】  
-- 出力は必ず上記の JSON 形式に従ってください。  
-- 各セクションには一意の識別子（例: section_1, section_2, ...）を付与してください。  
+【注意事項】
+- 出力は必ず上記の JSON 形式に従ってください。
+- 各セクションには一意の識別子（例: section_1, section_2, ...）を付与してください。
 - code_block には、そのセクションに対応するコードブロック全体を記述してください。省略は禁止です。
 - JSON 形式以外の出力は一切行わないでください。
 
@@ -52,25 +52,34 @@ code_detail_prompt_template = PromptTemplate(
 )
 
 blog_outline_prompt_template = PromptTemplate(
-    input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "project_files_content", "github_url", "target_audience", "blog_tone", "additional_requirements", "language"],
+    input_variables=[
+        "directory_tree",
+        "file_roles",
+        "detailed_code_analysis",
+        "project_files_content",
+        "github_url",
+        "target_audience",
+        "blog_tone",
+        "additional_requirements",
+        "language"],
     template="""
-あなたは有能なソフトウェアエンジニア兼テックライターです。  
+あなたは有能なソフトウェアエンジニア兼テックライターです。
 以下のコンテキスト情報を基に、テックブログの章立て（アウトライン）を考案してください。
 
 【コンテキスト】
-1) **ディレクトリ構造**:  
+1) **ディレクトリ構造**:
 {directory_tree}
 
-2) **ファイルの役割概要**:  
+2) **ファイルの役割概要**:
 {file_roles}
 
-3) **詳細なコード解説**:  
+3) **詳細なコード解説**:
 {detailed_code_analysis}
 
-※ 注意: 上記「詳細なコード解説」は、各機能ごとに一意の識別子を付与した JSON 形式で出力されています。  
+※ 注意: 上記「詳細なコード解説」は、各機能ごとに一意の識別子を付与した JSON 形式で出力されています。
 アウトライン作成時は、対応するコードブロックを参照する際に、各セクションの識別子（例: section_1, section_2, …）を必ず記載してください。
 
-4) **全ファイル内容** (参考用):  
+4) **全ファイル内容** (参考用):
 {project_files_content}
 
 【追加情報】
@@ -85,11 +94,20 @@ blog_outline_prompt_template = PromptTemplate(
 - 各章・節には、取り上げる話題および対応するコードブロック（上記「詳細なコード解説」で出力された JSON の識別子を参照する形）を必ず示してください。
 - Markdown 形式で出力してください。
 - 補足的な説明等は記述しないでください。
-"""
-)
+""")
 
 final_blog_prompt_template = PromptTemplate(
-    input_variables=["directory_tree", "file_roles", "detailed_code_analysis", "project_files_content", "github_url", "target_audience", "blog_tone", "additional_requirements", "language", "blog_outline"],
+    input_variables=[
+        "directory_tree",
+        "file_roles",
+        "detailed_code_analysis",
+        "project_files_content",
+        "github_url",
+        "target_audience",
+        "blog_tone",
+        "additional_requirements",
+        "language",
+        "blog_outline"],
     template="""
 あなたは有能なソフトウェアエンジニア兼テックライターです。
 
@@ -99,19 +117,19 @@ final_blog_prompt_template = PromptTemplate(
 {blog_outline}
 
 【その他のコンテキスト】
-1) **ディレクトリ構造**:  
+1) **ディレクトリ構造**:
 {directory_tree}
 
-2) **ファイルの役割概要**:  
+2) **ファイルの役割概要**:
 {file_roles}
 
-3) **詳細なコード解説**:  
+3) **詳細なコード解説**:
 {detailed_code_analysis}
 
-※ 注意: 上記「詳細なコード解説」は、各機能ごとに一意の識別子を付与した JSON 形式で出力されています。  
+※ 注意: 上記「詳細なコード解説」は、各機能ごとに一意の識別子を付与した JSON 形式で出力されています。
 各セクションの識別子（例: section_1, section_2, …）を参照して、対応するコードブロックを記事に追加してください。
 
-4) **全ファイル内容**:  
+4) **全ファイル内容**:
 {project_files_content}
 
 【追加情報】
@@ -128,8 +146,7 @@ final_blog_prompt_template = PromptTemplate(
 - ブログ記事以外の出力は禁止です。補足的な説明等も処理の邪魔になるため、記述しないでください。
 - アウトプットが長くなった場合、分割して出力してください。省略は禁止です。
 - 分割する場合、最後に<<<CONTINUE>>>というマーカーで終了する必要があります。
-"""
-)
+""")
 
 # -------------------------------
 # get_full_blog で使用する context_prompt の定義

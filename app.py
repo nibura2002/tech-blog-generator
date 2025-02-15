@@ -44,19 +44,24 @@ load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 if not openai_api_key:
     logger.error("OPENAI_API_KEY is not set. Please set it in the .env file.")
-    raise EnvironmentError("OPENAI_API_KEY is not set. Please set it in the .env file.")
+    raise EnvironmentError(
+        "OPENAI_API_KEY is not set. Please set it in the .env file.")
 logger.info("OPENAI_API_KEY successfully loaded.")
 
 ###############################################################################
 # Flask App Initialization
 ###############################################################################
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "replace_with_a_secure_random_key")
+app.secret_key = os.getenv(
+    "FLASK_SECRET_KEY",
+    "replace_with_a_secure_random_key")
 app.config['ENV'] = 'production'
 app.config['DEBUG'] = False
 app.config['TESTING'] = False
 
 # Redirect to www subdomain
+
+
 @app.before_request
 def redirect_to_www():
     host = request.headers.get("Host", "")
@@ -66,11 +71,13 @@ def redirect_to_www():
         target_url = request.url.replace(host, "www." + host, 1)
         return redirect(target_url, code=301)
 
+
 ###############################################################################
 # 進捗管理（履歴と最新状態）
 ###############################################################################
 progress_history = {}  # 全進捗履歴
 progress_status = {}   # 最新の進捗状態
+
 
 def update_progress(progress_id, message):
     """進捗履歴と最新状態を更新する"""
@@ -80,6 +87,7 @@ def update_progress(progress_id, message):
     progress_history[progress_id] += message
     progress_status[progress_id] = message
 
+
 ###############################################################################
 # バックグラウンド処理用結果保管
 ###############################################################################
@@ -88,6 +96,8 @@ result_store = {}
 ###############################################################################
 # Helper Functions for Parameter Retrieval
 ###############################################################################
+
+
 def get_common_params_from_form():
     return {
         "github_url": request.form.get("github_url", "").strip(),
@@ -96,6 +106,7 @@ def get_common_params_from_form():
         "additional_requirements": request.form.get("additional_requirements", "").strip(),
         "language": request.form.get("language", "ja").strip()
     }
+
 
 def get_common_params_from_args():
     return {
@@ -109,6 +120,8 @@ def get_common_params_from_args():
 ###############################################################################
 # Utility functions
 ###############################################################################
+
+
 def read_project_files(root_dir):
     logger.info("Reading project files from: %s", root_dir)
     all_text = []
@@ -137,16 +150,23 @@ def read_project_files(root_dir):
             try:
                 size = os.path.getsize(file_path)
                 if size > max_size:
-                    logger.info("Skipping large file (>20MB): %s (size=%d bytes)", file_path, size)
+                    logger.info(
+                        "Skipping large file (>20MB): %s (size=%d bytes)",
+                        file_path,
+                        size)
                     continue
             except Exception as e:
-                logger.warning("Could not determine file size for %s: %s", file_path, e)
+                logger.warning(
+                    "Could not determine file size for %s: %s", file_path, e)
                 continue
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     content = f.read()
                 if len(content) > max_chars:
-                    logger.info("Skipping file due to excessive length (>20000 chars): %s (length=%d)", file_path, len(content))
+                    logger.info(
+                        "Skipping file due to excessive length (>20000 chars): %s (length=%d)",
+                        file_path,
+                        len(content))
                     continue
                 relative_path = os.path.relpath(file_path, root_dir)
                 header = f"\n\n### File: {relative_path}\n"
@@ -155,8 +175,11 @@ def read_project_files(root_dir):
                 logger.warning("Could not read file %s: %s", file_path, e)
                 continue
     combined_text = "\n".join(all_text)
-    logger.info("Completed reading project files. Total length: %d characters", len(combined_text))
+    logger.info(
+        "Completed reading project files. Total length: %d characters",
+        len(combined_text))
     return combined_text
+
 
 def get_directory_tree(root_dir):
     tree_lines = []
@@ -168,6 +191,7 @@ def get_directory_tree(root_dir):
             tree_lines.append(f"{indent}│   ├── {f}")
     return "\n".join(tree_lines)
 
+
 def strip_code_fences(text: str) -> str:
     text = re.sub(r"```[a-zA-Z]*\n", "", text)
     text = text.replace("```", "")
@@ -176,7 +200,16 @@ def strip_code_fences(text: str) -> str:
 ###############################################################################
 # バックグラウンド処理関数（プロジェクト解析）
 ###############################################################################
-def process_project(progress_id, github_url, target_audience, blog_tone, additional_requirements, language, temp_project_dir):
+
+
+def process_project(
+        progress_id,
+        github_url,
+        target_audience,
+        blog_tone,
+        additional_requirements,
+        language,
+        temp_project_dir):
     try:
         update_progress(progress_id, "Step 1: プロジェクトファイルの取得を開始します...\n")
         if os.listdir(temp_project_dir):
@@ -190,7 +223,9 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
                 logger.info("Project files obtained from GitHub clone.")
             except subprocess.CalledProcessError as e:
                 update_progress(progress_id, "GitHubリポジトリのクローンに失敗しました。\n")
-                logger.error("GitHub clone failed: %s", e.output.decode("utf-8"))
+                logger.error(
+                    "GitHub clone failed: %s",
+                    e.output.decode("utf-8"))
                 return
 
         update_progress(progress_id, "Step 2: ディレクトリ構造を取得中...\n")
@@ -219,7 +254,8 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
             ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"
         )
         for dirpath, dirnames, filenames in os.walk(temp_project_dir):
-            dirnames[:] = [d for d in dirnames if "__pycache__" not in d and ".git" not in d and ".vscode" not in d]
+            dirnames[:] = [
+                d for d in dirnames if "__pycache__" not in d and ".git" not in d and ".vscode" not in d]
             for file in filenames:
                 if file.lower().endswith(disallowed_extensions):
                     continue
@@ -232,8 +268,14 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
 
         for i, file_path in enumerate(all_files, 1):
             relative_file_path = os.path.relpath(file_path, temp_project_dir)
-            update_progress(progress_id, f"ファイル解析中: {i}/{total_files} -> {relative_file_path}\n")
-            logger.info("Processing file %d/%d: %s", i, total_files, relative_file_path)
+            update_progress(
+                progress_id,
+                f"ファイル解析中: {i}/{total_files} -> {relative_file_path}\n")
+            logger.info(
+                "Processing file %d/%d: %s",
+                i,
+                total_files,
+                relative_file_path)
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     file_content = f.read()
@@ -245,13 +287,14 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
                 })
                 detailed_code_analysis += f"\n\n## {relative_file_path}\n" + file_detail
             except Exception as e:
-                update_progress(progress_id, f"ファイル解析失敗: {relative_file_path} - {e}\n")
+                update_progress(progress_id,
+                                f"ファイル解析失敗: {relative_file_path} - {e}\n")
                 logger.warning("Failed to analyze file %s: %s", file_path, e)
         update_progress(progress_id, "各ファイルの詳細なコード解説完了。\n")
         project_files_content = read_project_files(temp_project_dir)
 
         update_progress(progress_id, "一旦基本情報の抽出が完了しました。\n")
-        
+
         # 結果保存
         result_store[progress_id + "_tree"] = directory_tree
         result_store[progress_id + "_roles"] = file_roles
@@ -286,22 +329,29 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
 # バックグラウンド処理関数（最終ブログ生成）
 ###############################################################################
 
-def get_full_blog(llm, initial_response, params, progress_id, max_iterations=10):
+def get_full_blog(
+        llm,
+        initial_response,
+        params,
+        progress_id,
+        max_iterations=10):
     directory_tree = result_store.get(progress_id + "_tree", "")
     file_roles = result_store.get(progress_id + "_roles", "")
     detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
     project_files_content = result_store.get(progress_id + "_files", "")
     blog_outline = result_store.get(progress_id + "_outline", "")
-    
+
     full_blog = initial_response
-    marker_pattern = re.compile(r"<{1,4}CONTINUE>{1,4}(?:\s*```)?(?:\n```)?\s*$", re.IGNORECASE)
-    
+    marker_pattern = re.compile(
+        r"<{1,4}CONTINUE>{1,4}(?:\s*```)?(?:\n```)?\s*$",
+        re.IGNORECASE)
+
     for _ in range(max_iterations):
         if not marker_pattern.search(full_blog):
             break
 
         update_progress(progress_id, "分割された出力を生成中...\n")
-        
+
         # context_blog_prompt_template を利用して、プロンプトの内容を生成
         context_prompt = context_blog_prompt_template.format(
             directory_tree=directory_tree,
@@ -321,13 +371,14 @@ def get_full_blog(llm, initial_response, params, progress_id, max_iterations=10)
 
     return full_blog
 
+
 def process_final_blog(progress_id, params):
     try:
         logger.info("process_final_blog 開始: progress_id=%s", progress_id)
         update_progress(progress_id, "Step 6: 最終テックブログ生成中...\n")
         llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
         final_chain = final_blog_prompt_template | llm
-        
+
         initial_response = final_chain.invoke({
             "directory_tree": result_store.get(progress_id + "_tree", ""),
             "file_roles": result_store.get(progress_id + "_roles", ""),
@@ -340,9 +391,9 @@ def process_final_blog(progress_id, params):
             "language": params["language"],
             "blog_outline": result_store.get(progress_id + "_outline", "")
         })
-        
+
         full_blog = get_full_blog(llm, initial_response, params, progress_id)
-        
+
         result_store[progress_id] = full_blog
         update_progress(progress_id, "最終テックブログの生成が完了しました。\n")
         logger.info("process_final_blog 完了: progress_id=%s", progress_id)
@@ -353,28 +404,35 @@ def process_final_blog(progress_id, params):
 ###############################################################################
 # SSE 用の進捗更新エンドポイント
 ###############################################################################
+
+
 @app.route('/progress_stream')
 def progress_stream():
     progress_id = session.get("progress_id", None)
     if not progress_id:
-        return Response("data: {\"progress\": \"進捗情報がありません。\", \"history\": \"\"}\n\n", mimetype="text/event-stream")
+        return Response(
+            "data: {\"progress\": \"進捗情報がありません。\", \"history\": \"\"}\n\n",
+            mimetype="text/event-stream")
 
     def event_stream():
         while True:
             current_status = progress_status.get(progress_id, "処理が開始されていません。")
             current_history = progress_history.get(progress_id, "進捗情報はありません。")
-            data = json.dumps({"progress": current_status, "history": current_history})
+            data = json.dumps({"progress": current_status,
+                              "history": current_history})
             yield f"data: {data}\n\n".encode("utf-8")
             if (current_status.find("最終テックブログの生成が完了しました") != -1 or
-                current_status.find("ブログアウトラインの生成が完了しました") != -1):
+                    current_status.find("ブログアウトラインの生成が完了しました") != -1):
                 break
             time.sleep(3)
     return Response(stream_with_context(event_stream()),
-                mimetype="text/event-stream", direct_passthrough=True)
+                    mimetype="text/event-stream", direct_passthrough=True)
 
 ###############################################################################
 # Markdownダウンロード
 ###############################################################################
+
+
 @app.route("/download_markdown", methods=["GET"])
 def download_markdown():
     progress_id = session.get("progress_id", None)
@@ -385,16 +443,23 @@ def download_markdown():
     with tempfile.NamedTemporaryFile(delete=False, suffix=".md") as tmp_file:
         tmp_file.write(blog_markdown.encode("utf-8"))
         tmp_file_name = tmp_file.name
-    return send_file(tmp_file_name, as_attachment=True, download_name="tech_blog.md", mimetype="text/markdown")
+    return send_file(
+        tmp_file_name,
+        as_attachment=True,
+        download_name="tech_blog.md",
+        mimetype="text/markdown")
 
 ###############################################################################
 # メインフロー: index.html で実装（POST送信で処理の種類を判別）
 ###############################################################################
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
         # 新規プロジェクト送信の場合のみセッション初期化
-        if "project_folder" in request.files or request.form.get("github_url", ""):
+        if "project_folder" in request.files or request.form.get(
+                "github_url", ""):
             session.pop("progress_id", None)
             session.pop("params", None)
             session.pop("final_blog_started", None)
@@ -450,12 +515,23 @@ def index():
 
             threading.Thread(
                 target=process_project,
-                args=(progress_id, github_url, target_audience, blog_tone, additional_requirements, language, temp_project_dir),
-                daemon=True
-            ).start()
+                args=(
+                    progress_id,
+                    github_url,
+                    target_audience,
+                    blog_tone,
+                    additional_requirements,
+                    language,
+                    temp_project_dir),
+                daemon=True).start()
 
             flash("プロジェクト解析を開始しました。しばらくお待ちください。", "info")
-            return render_template("index.html", progress_id=progress_id, progress_log=progress_history.get(progress_id, ""))
+            return render_template(
+                "index.html",
+                progress_id=progress_id,
+                progress_log=progress_history.get(
+                    progress_id,
+                    ""))
     else:
         progress_id = session.get("progress_id", None)
         blog_markdown = ""
@@ -467,7 +543,9 @@ def index():
             blog_markdown = result_store.get(progress_id, "")
             blog_outline = result_store.get(progress_id + "_outline", "")
             progress_log = progress_history.get(progress_id, "進捗情報はありません。")
-            converted_html = markdown.markdown(blog_markdown, extensions=['fenced_code', 'codehilite'])
+            converted_html = markdown.markdown(
+                blog_markdown, extensions=[
+                    'fenced_code', 'codehilite'])
         if blog_markdown:
             viewType = "final"
         elif blog_outline and (progress_status.get(progress_id, "")).find("生成中") == -1:
@@ -487,6 +565,8 @@ def index():
 ###############################################################################
 # 最終ブログ生成（POSTのみ）
 ###############################################################################
+
+
 @app.route("/generate_final_blog", methods=["POST"])
 def generate_final_blog():
     progress_id = session.get("progress_id", None)
@@ -503,8 +583,15 @@ def generate_final_blog():
         ).start()
     return jsonify({"status": "最終テックブログ生成開始"}), 200
 
+
 ###############################################################################
 # Run the Flask App
 ###############################################################################
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), debug=False)
+    app.run(
+        host="0.0.0.0",
+        port=int(
+            os.environ.get(
+                "PORT",
+                8080)),
+        debug=False)
