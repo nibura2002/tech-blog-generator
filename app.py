@@ -200,8 +200,8 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
 
         update_progress(progress_id, "Step 3: 各ファイルの役割を要約中...\n")
         llm = ChatOpenAI(model_name="o3-mini", openai_api_key=openai_api_key)
-        file_role_chain = LLMChain(llm=llm, prompt=file_role_prompt_template)
-        file_roles = file_role_chain.run({"directory_tree": directory_tree})
+        file_role_chain = file_role_prompt_template | llm
+        file_roles = file_role_chain.invoke({"directory_tree": directory_tree})
         update_progress(progress_id, "各ファイルの役割要約完了。\n")
         logger.info("File roles summary obtained.")
 
@@ -237,8 +237,8 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
             try:
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     file_content = f.read()
-                code_detail_chain = LLMChain(llm=llm, prompt=code_detail_prompt_template)
-                file_detail = code_detail_chain.run({
+                code_detail_chain = code_detail_prompt_template | llm
+                file_detail = code_detail_chain.invoke({
                     "file_path": relative_file_path,
                     "file_content": file_content,
                     "language": language
@@ -260,8 +260,8 @@ def process_project(progress_id, github_url, target_audience, blog_tone, additio
 
         # Step 5: アウトライン生成
         update_progress(progress_id, "Step 5: ブログアウトラインを生成中...\n")
-        outline_chain = LLMChain(llm=llm, prompt=blog_outline_prompt_template)
-        blog_outline = outline_chain.run({
+        outline_chain = blog_outline_prompt_template | llm
+        blog_outline = outline_chain.invoke({
             "directory_tree": directory_tree,
             "file_roles": file_roles,
             "detailed_code_analysis": detailed_code_analysis,
@@ -326,9 +326,9 @@ def process_final_blog(progress_id, params):
         logger.info("process_final_blog 開始: progress_id=%s", progress_id)
         update_progress(progress_id, "Step 6: 最終テックブログ生成中...\n")
         llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
-        final_chain = LLMChain(llm=llm, prompt=final_blog_prompt_template)
+        final_chain = final_blog_prompt_template | llm
         
-        initial_response = final_chain.run({
+        initial_response = final_chain.invoke({
             "directory_tree": result_store.get(progress_id + "_tree", ""),
             "file_roles": result_store.get(progress_id + "_roles", ""),
             "detailed_code_analysis": result_store.get(progress_id + "_analysis", ""),
