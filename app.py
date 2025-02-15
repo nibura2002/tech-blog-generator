@@ -272,6 +272,9 @@ final_blog_prompt_template = PromptTemplate(
 3) **詳細なコード解説**:  
 {detailed_code_analysis}
 
+※ 注意: 上記「詳細なコード解説」は、各機能ごとに一意の識別子を付与した JSON 形式で出力されています。  
+各セクションの識別子（例: section_1, section_2, …）を参照して、対応するコードブロックを記事に追加してください。
+
 4) **全ファイル内容**:  
 {project_files_content}
 
