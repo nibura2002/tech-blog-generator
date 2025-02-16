@@ -61,6 +61,9 @@ app.config['ENV'] = 'production'
 app.config['DEBUG'] = False
 app.config['TESTING'] = False
 
+# Session configuration
+app.config['SESSION_PERMANENT'] = False
+
 # Redirect to www subdomain
 
 
