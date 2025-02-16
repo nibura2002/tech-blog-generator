@@ -553,7 +553,7 @@ def index():
         blog_outline = ""
         converted_html = ""
         progress_log = ""
-
+        # viewType の判定：初期、アウトライン、ステータス、最終
         viewType = "initial"
         if progress_id:
             blog_markdown = result_store.get(progress_id, "")
@@ -660,6 +660,8 @@ def preview_markdown():
 
 @app.route("/reset", methods=["GET"])
 def reset():
+    #
+
     progress_id = session.get("progress_id")
     if progress_id:
         # 関連する進捗情報と結果データを削除
