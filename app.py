@@ -183,13 +183,6 @@ def get_directory_tree(root_dir):
             tree_lines.append(f"{indent}│   ├── {f}")
     return "\n".join(tree_lines)
 
-
-def strip_code_fences(text: str) -> str:
-    # Remove markdown code fences. This is necessary for the HTML conversion.
-    # Remove ```markdown at the top and ``` at the bottom
-    text = re.sub(r"```(?:markdown)?\n", "", text, count=1)
-
-
 ###############################################################################
 # 共通アウトライン生成関数
 ###############################################################################
@@ -356,7 +349,7 @@ def get_full_blog(
         initial_response,
         params,
         progress_id,
-        max_iterations=10):
+        max_iterations=20):
     directory_tree = result_store.get(progress_id + "_tree", "")
     file_roles = result_store.get(progress_id + "_roles", "")
     detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
@@ -560,7 +553,8 @@ def index():
         blog_outline = ""
         converted_html = ""
         progress_log = ""
-        # viewType の判定：初期、アウトライン、ステータス、最終
+
+        viewType = "initial"
         if progress_id:
             blog_markdown = result_store.get(progress_id, "")
             blog_outline = result_store.get(progress_id + "_outline", "")
@@ -653,12 +647,34 @@ def preview_markdown():
     # 編集された本文を取得
     edited_markdown = request.form.get("edited_markdown", "")
     # MarkdownをHTMLに変換
-    converted_html = strip_code_fences(edited_markdown)
     converted_html = markdown.markdown(
         edited_markdown, extensions=[
             'fenced_code', 'codehilite'])
     # JSONで返す
     return jsonify({"preview": converted_html})
+
+###############################################################################
+# リセット処理
+###############################################################################
+
+
+@app.route("/reset", methods=["GET"])
+def reset():
+    progress_id = session.get("progress_id")
+    if progress_id:
+        # 関連する進捗情報と結果データを削除
+        progress_history.pop(progress_id, None)
+        progress_status.pop(progress_id, None)
+        result_store.pop(progress_id, None)
+        result_store.pop(progress_id + "_outline", None)
+        result_store.pop(progress_id + "_tree", None)
+        result_store.pop(progress_id + "_roles", None)
+        result_store.pop(progress_id + "_analysis", None)
+        result_store.pop(progress_id + "_files", None)
+    # セッション情報をクリア
+    session.clear()
+    flash("セッションがリセットされました。", "info")
+    return redirect(url_for("index"))
 
 
 ###############################################################################

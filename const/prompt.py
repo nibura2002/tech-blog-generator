@@ -61,10 +61,35 @@ blog_outline_prompt_template = PromptTemplate(
         "target_audience",
         "blog_tone",
         "additional_requirements",
-        "language"],
+        "language"
+    ],
     template="""
 あなたは有能なソフトウェアエンジニア兼テックライターです。
-以下のコンテキスト情報を基に、テックブログの章立て（アウトライン）を考案してください。
+以下のコンテキスト情報をもとに、テックブログの記事構成のアウトラインを、以下のJSONスキーマに厳密に従って出力してください。
+
+【JSONスキーマ】
+{{
+  "chapters": [
+    {{
+      "id": "chapter_1",
+      "title": "1章: 章のタイトル",
+      "sections": [
+        {{
+          "id": "section_1",
+          "title": "1-1: 節のタイトル",
+          "items": [
+            {{
+              "id": "item_1",
+              "title": "1-2: 項のタイトル",
+              "summary": "項の内容の概要",
+              "code_ref": "対応する詳細コード解説の識別子（コードブロックが存在しない場合は空文字列またはnull）"
+            }}
+          ]
+        }}
+      ]
+    }}
+  ]
+}}
 
 【コンテキスト】
 1) **ディレクトリ構造**:
@@ -75,9 +100,7 @@ blog_outline_prompt_template = PromptTemplate(
 
 3) **詳細なコード解説**:
 {detailed_code_analysis}
-
-※ 注意: 上記「詳細なコード解説」は、各機能ごとに一意の識別子を付与した JSON 形式で出力されています。
-アウトライン作成時は、対応するコードブロックを参照する際に、各セクションの識別子（例: section_1, section_2, …）を必ず記載してください。
+※ 「詳細なコード解説」は、各機能ごとに一意の識別子を付与したJSON形式です。アウトライン作成時は、対応するコードブロックを参照する場合、必ずその識別子（例: section_1, section_2, …）を含めてください。
 
 4) **全ファイル内容** (参考用):
 {project_files_content}
@@ -90,11 +113,10 @@ blog_outline_prompt_template = PromptTemplate(
 - 解説言語: {language}
 
 【出力要件】
-- ブログ全体のアウトラインを、**章**（大項目）、**節**（中項目）、**項**（小項目）に分けた形式で箇条書きしてください。
-- 各章・節には、取り上げる話題および対応するコードブロック（上記「詳細なコード解説」で出力された JSON の識別子を参照する形）を必ず示してください。
-- Markdown 形式で出力してください。
-- 補足的な説明等は記述しないでください。
-""")
+- 上記JSONスキーマに厳密に従い、余計なテキストや補足説明を一切含めず、JSON形式のみでアウトラインを出力してください。
+- 各 "item" には、項目のタイトル、内容の概要を示す "summary"、および対応するコードブロックの識別子 "code_ref" を必ず含めてください。コードブロックが存在しない場合は、"code_ref" に空文字列またはnullを設定してください。
+"""
+)
 
 final_blog_prompt_template = PromptTemplate(
     input_variables=[

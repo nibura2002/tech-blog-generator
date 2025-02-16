@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <title>Tech Blog Generator</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pygments.css') }}">
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6831610624805777"
-     crossorigin="anonymous"></script>
+        crossorigin="anonymous"></script>
 </head>
+
 <body>
     <div class="container">
         <!-- サイドバー（常に表示） -->
@@ -51,56 +53,63 @@
         <!-- メインコンテンツ -->
         <main class="main-content">
             {% with messages = get_flashed_messages(category_filter=["error", "info", "warning"]) %}
-              {% if messages %}
-                <ul class="flashes">
-                  {% for message in messages %}
-                    <li>{{ message }}</li>
-                  {% endfor %}
-                </ul>
-              {% endif %}
+            {% if messages %}
+            <ul class="flashes">
+                {% for message in messages %}
+                <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
             {% endwith %}
 
             {% if blog_markdown and viewType == "final" %}
             <h1>最終ブログ確認</h1>
             <div class="final-container">
-              <!-- 編集パネル -->
-              <div class="edit-panel">
-                <!-- アウトライン編集エリア -->
-                <div class="outline-section">
-                   <h2>アウトライン (編集可能)</h2>
-                   <form id="outlineForm">
-                       <textarea name="edited_outline" rows="15" cols="100">{{ blog_outline|e }}</textarea>
-                   </form>
+                <!-- 編集パネル -->
+                <div class="edit-panel">
+                    <!-- アウトライン編集エリア -->
+                    <div class="outline-section">
+                        <h2>アウトライン (編集可能)</h2>
+                        <form id="outlineForm">
+                            <textarea name="edited_outline" rows="15" cols="100">{{ blog_outline|e }}</textarea>
+                        </form>
+                    </div>
+                    <!-- 本文編集エリア -->
+                    <div class="content-section">
+                        <h2>本文 (編集可能)</h2>
+                        <form id="blogForm" method="POST">
+                            <textarea name="edited_markdown" rows="25" cols="100">{{ blog_markdown|e }}</textarea>
+                        </form>
+                    </div>
+                    <!-- 再生成ボタン群（アウトライン・本文を隣接して配置） -->
+                    <div class="regen-buttons">
+                        <button type="button" id="regenerateOutlineButton"
+                            onclick="submitOutline()">アウトライン・本文を再生成</button>
+                        <button type="button" id="regenerateContentButton"
+                            onclick="submitBlogGeneration()">本文を再生成</button>
+                    </div>
                 </div>
-                <!-- 本文編集エリア -->
-                <div class="content-section">
-                   <h2>本文 (編集可能)</h2>
-                   <form id="blogForm" method="POST">
-                       <textarea name="edited_markdown" rows="25" cols="100">{{ blog_markdown|e }}</textarea>
-                   </form>
+                <!-- プレビューセクション -->
+                <div class="preview-section">
+                    <h2>プレビュー (Markdown → HTML)</h2>
+                    <form id="previewForm">
+                        <button type="button" onclick="updatePreview()">Previewを更新</button>
+                    </form>
+                    <div id="preview-container">{{ converted_html|safe }}</div>
+                    <br>
+                    <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
                 </div>
-                <!-- 再生成ボタン群（アウトライン・本文を隣接して配置） -->
-                <div class="regen-buttons">
-                   <button type="button" id="regenerateOutlineButton" onclick="submitOutline()">アウトライン・本文を再生成</button>
-                   <button type="button" id="regenerateContentButton" onclick="submitBlogGeneration()">本文を再生成</button>
-                </div>
-              </div>
-              <!-- プレビューセクション -->
-              <div class="preview-section">
-                <h2>プレビュー (Markdown → HTML)</h2>
-                <!-- 本文編集後の下にPreview更新ボタンを配置 -->
-                <form id="previewForm">
-                    <button type="button" onclick="updatePreview()">Previewを更新</button>
-                </form>
-                <div id="preview-container">{{ converted_html|safe }}</div>
-                <br>
-                <a href="{{ url_for('download_markdown') }}">この内容でMarkdownをダウンロード</a>
-             </div>
             </div>
+            <!-- 「リセット」ボタンの追加 -->
+            <br><br>
+            <form action="{{ url_for('reset') }}" method="get">
+                <button type="submit">すべての情報をリフレッシュして最初の画面に戻る</button>
+            </form>
             <script>
-               // 最終生成画面ではリロード用フラグをクリア
-               sessionStorage.removeItem("reloadTriggered");
+                // 最終生成画面ではリロード用フラグをクリア
+                sessionStorage.removeItem("reloadTriggered");
             </script>
+            {% elif blog_markdown and viewType == "preview" %}
             {% elif blog_outline and viewType == "outline" %}
             <!-- アウトライン確認画面（既存） -->
             <h1>アウトライン確認</h1>
@@ -127,9 +136,10 @@
     </div>
     <!-- viewType を JS 変数に出力 -->
     <script>
-       var viewType = "{{ viewType }}";
-       console.log("viewType:", viewType);
+        var viewType = "{{ viewType }}";
+        console.log("viewType:", viewType);
     </script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
+
 </html>
