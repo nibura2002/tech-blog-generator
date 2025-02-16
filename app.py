@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 from flask import Flask, request, render_template, redirect, url_for, flash, send_file, session, jsonify, Response, stream_with_context
 from werkzeug.utils import secure_filename
 
-
 # LLM用プロンプトのインポート
 from const.prompt import (
     file_role_prompt_template,
@@ -186,9 +185,40 @@ def get_directory_tree(root_dir):
 
 
 def strip_code_fences(text: str) -> str:
-    text = re.sub(r"```[a-zA-Z]*\n", "", text)
-    text = text.replace("```", "")
-    return text
+    # Remove markdown code fences. This is necessary for the HTML conversion.
+    # Remove ```markdown at the top and ``` at the bottom
+    text = re.sub(r"```(?:markdown)?\n", "", text, count=1)
+
+
+###############################################################################
+# 共通アウトライン生成関数
+###############################################################################
+
+
+def generate_outline_common(
+        progress_id,
+        params,
+        directory_tree,
+        file_roles,
+        detailed_code_analysis,
+        project_files_content):
+    update_progress(progress_id, "アウトライン生成中...\n")
+    llm = ChatOpenAI(model_name="o3-mini", openai_api_key=openai_api_key)
+    outline_chain = blog_outline_prompt_template | llm
+    blog_outline = outline_chain.invoke({
+        "directory_tree": directory_tree,
+        "file_roles": file_roles,
+        "detailed_code_analysis": detailed_code_analysis,
+        "project_files_content": project_files_content,
+        "github_url": params.get("github_url", ""),
+        "target_audience": params.get("target_audience", ""),
+        "blog_tone": params.get("blog_tone", ""),
+        "additional_requirements": params.get("additional_requirements", ""),
+        "language": params.get("language", "")
+    }).content
+    result_store[progress_id + "_outline"] = blog_outline
+    update_progress(progress_id, "ブログアウトラインの生成が完了しました。\n")
+    return blog_outline
 
 ###############################################################################
 # バックグラウンド処理関数（プロジェクト解析）
@@ -276,39 +306,50 @@ def process_project(
 
         update_progress(progress_id, "一旦基本情報の抽出が完了しました。\n")
 
-        # 結果保存
+        # 取得した各種情報を result_store に保存
         result_store[progress_id + "_tree"] = directory_tree
         result_store[progress_id + "_roles"] = file_roles
         result_store[progress_id + "_analysis"] = detailed_code_analysis
         result_store[progress_id + "_files"] = project_files_content
 
-        # Step 5: アウトライン生成
-        update_progress(progress_id, "Step 5: ブログアウトラインを生成中...\n")
-        outline_chain = blog_outline_prompt_template | llm
-        blog_outline = outline_chain.invoke({
-            "directory_tree": directory_tree,
-            "file_roles": file_roles,
-            "detailed_code_analysis": detailed_code_analysis,
-            "project_files_content": project_files_content,
+        # Step 5: アウトライン生成（共通関数を利用）
+        generate_outline_common(progress_id, {
             "github_url": github_url,
             "target_audience": target_audience,
             "blog_tone": blog_tone,
             "additional_requirements": additional_requirements,
             "language": language
-        }).content
-        logger.info("Blog outline generated.")
-        result_store[progress_id + "_outline"] = blog_outline
-        update_progress(progress_id, "ブログアウトラインの生成が完了しました。\n")
+        }, directory_tree, file_roles, detailed_code_analysis, project_files_content)
 
         logger.info("Project analysis completed.")
 
     except Exception as e:
         update_progress(progress_id, f"処理中にエラー発生: {e}\n")
 
+###############################################################################
+# アウトライン再生成処理（関数として切り分け）
+###############################################################################
+
+
+def process_outline_regeneration(progress_id, params):
+    update_progress(progress_id, "アウトライン再生成中...\n")
+    # 以下、必要な各種データはすでに result_store に保存されている前提
+    directory_tree = result_store.get(progress_id + "_tree", "")
+    file_roles = result_store.get(progress_id + "_roles", "")
+    detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
+    project_files_content = result_store.get(progress_id + "_files", "")
+    generate_outline_common(
+        progress_id,
+        params,
+        directory_tree,
+        file_roles,
+        detailed_code_analysis,
+        project_files_content)
 
 ###############################################################################
 # バックグラウンド処理関数（最終ブログ生成）
 ###############################################################################
+
 
 def get_full_blog(
         llm,
@@ -370,11 +411,11 @@ def process_final_blog(progress_id, params):
             "blog_tone": params["blog_tone"],
             "additional_requirements": params["additional_requirements"],
             "language": params["language"],
-            "blog_outline": result_store.get(progress_id + "_outline", "")
+            "blog_outline": result_store.get(progress_id + "_outline", ""),
+            "existing_blog": result_store.get(progress_id, "")
         }).content
 
         full_blog = get_full_blog(llm, initial_response, params, progress_id)
-
         result_store[progress_id] = full_blog
         update_progress(progress_id, "最終テックブログの生成が完了しました。\n")
         logger.info("process_final_blog 完了: progress_id=%s", progress_id)
@@ -455,8 +496,8 @@ def index():
             result_store[progress_id] = edited_markdown
             flash("ブログが更新されました。", "info")
             return redirect(url_for("index"))
-        # アウトライン更新（ユーザーによる修正）
-        elif "edited_outline" in request.form:
+        # アウトライン更新（ユーザーによる修正・ただし再生成フラグがなければ）
+        elif "edited_outline" in request.form and not request.form.get("regenerate_outline"):
             progress_id = session.get("progress_id", None)
             if not progress_id:
                 flash("進捗IDがありません。", "error")
@@ -527,14 +568,15 @@ def index():
             converted_html = markdown.markdown(
                 blog_markdown, extensions=[
                     'fenced_code', 'codehilite'])
-        if blog_markdown:
-            viewType = "final"
-        elif blog_outline and (progress_status.get(progress_id, "")).find("生成中") == -1:
-            viewType = "outline"
-        elif progress_status.get(progress_id, "").find("生成中") != -1:
-            viewType = "status"
-        else:
-            viewType = "initial"
+
+            if progress_status.get(progress_id, "").find("生成中") != -1:
+                viewType = "status"
+            elif blog_markdown:
+                viewType = "final"
+            elif blog_outline:
+                viewType = "outline"
+            else:
+                viewType = "initial"
         return render_template("index.html",
                                progress_id=progress_id,
                                blog_markdown=blog_markdown,
@@ -544,7 +586,7 @@ def index():
                                viewType=viewType)
 
 ###############################################################################
-# 最終ブログ生成（POSTのみ）
+# 最終ブログ生成（POSTのみ）およびアウトライン再生成処理
 ###############################################################################
 
 
@@ -553,16 +595,70 @@ def generate_final_blog():
     progress_id = session.get("progress_id", None)
     if not progress_id:
         return jsonify({"error": "progress_idがありません。"}), 400
+
     params = session.get("params", {})
-    if not session.get("final_blog_started", False):
-        session["final_blog_started"] = True
-        update_progress(progress_id, "最終テックブログの生成が開始しました。\n")
-        threading.Thread(
-            target=process_final_blog,
-            args=(progress_id, params),
-            daemon=True
-        ).start()
+
+    # アウトライン再生成フラグがある場合は、アウトライン再生成処理を呼び出す
+    if request.form.get("regenerate_outline") == "true":
+        update_progress(progress_id, "アウトライン再生成処理を開始します...\n")
+        process_outline_regeneration(progress_id, params)
+    else:
+        # ユーザーによるアウトライン編集がある場合はその内容を反映
+        if "edited_outline" in request.form:
+            edited_outline = request.form.get("edited_outline", "")
+            result_store[progress_id + "_outline"] = edited_outline
+
+    # 最終ブログ生成処理を開始する
+    session["final_blog_started"] = True
+    update_progress(progress_id, "最終テックブログ生成中...\n")
+    threading.Thread(
+        target=process_final_blog,
+        args=(progress_id, params),
+        daemon=True
+    ).start()
     return jsonify({"status": "最終テックブログ生成開始"}), 200
+
+###############################################################################
+# ブログ本文再生成（POSTのみ）
+###############################################################################
+
+
+@app.route("/regenerate_blog", methods=["POST"])
+def regenerate_blog():
+    progress_id = session.get("progress_id", None)
+    if not progress_id:
+        return jsonify({"error": "progress_idがありません。"}), 400
+    params = session.get("params", {})
+
+    # 編集された本文を更新
+    edited_markdown = request.form.get("edited_markdown", "")
+    result_store[progress_id] = edited_markdown
+
+    session["final_blog_started"] = True
+    update_progress(progress_id, "本文による再生成生成中...\n")
+    threading.Thread(
+        target=process_final_blog,
+        args=(progress_id, params),
+        daemon=True
+    ).start()
+    return jsonify({"status": "本文再生成開始"}), 200
+
+###############################################################################
+# プレビューMarkdown（POSTのみ）
+###############################################################################
+
+
+@app.route("/preview_markdown", methods=["POST"])
+def preview_markdown():
+    # 編集された本文を取得
+    edited_markdown = request.form.get("edited_markdown", "")
+    # MarkdownをHTMLに変換
+    converted_html = strip_code_fences(edited_markdown)
+    converted_html = markdown.markdown(
+        edited_markdown, extensions=[
+            'fenced_code', 'codehilite'])
+    # JSONで返す
+    return jsonify({"preview": converted_html})
 
 
 ###############################################################################
@@ -571,8 +667,6 @@ def generate_final_blog():
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
-        port=int(
-            os.environ.get(
-                "PORT",
-                8080)),
-        debug=False)
+        port=int(os.environ.get("PORT", 8080)),
+        debug=False
+    )

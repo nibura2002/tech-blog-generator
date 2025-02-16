@@ -35,6 +35,7 @@ function submitOutline() {
     })
     .then(response => response.json())
     .then(() => {
+       // リロードすると index で進捗状況がチェックされ、生成中ならステータス画面へ
        window.location.reload();
     })
     .catch(error => {
@@ -48,19 +49,21 @@ function submitOutline() {
     });
 }
 
-// ブログ編集（プレビュー更新）
-function submitBlog() {
+// 本文再生成用の関数
+function submitBlogGeneration() {
     const formData = new FormData(document.getElementById("blogForm"));
-    fetch("/", {
+    fetch("/regenerate_blog", {
       method: "POST",
       body: formData
     })
-    .then(response => response.text())
+    .then(response => response.json())
     .then(() => {
+       // リロードして、生成中ならステータス画面を表示
        window.location.reload();
     })
-    .catch(error => console.error("ブログ送信エラー:", error));
+    .catch(error => console.error("本文再生成エラー:", error));
 }
+// （既存のsubmitProjectやSSE関連の関数はそのまま）
 
 // SSE を利用して進捗情報を取得（ブログ生成ステータス画面用）
 function startProgressSSE() {
@@ -98,3 +101,20 @@ document.addEventListener("DOMContentLoaded", function () {
         startProgressSSE();
     }
 });
+
+// Preview更新用関数
+function updatePreview() {
+    const blogForm = document.getElementById("blogForm");
+    const formData = new FormData(blogForm);
+    fetch("/preview_markdown", {
+      method: "POST",
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+       // preview-container の内容を更新
+       const previewContainer = document.getElementById("preview-container");
+       previewContainer.innerHTML = data.preview;
+    })
+    .catch(error => console.error("Preview更新エラー:", error));
+}
