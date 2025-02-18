@@ -19,7 +19,8 @@ from const.prompt import (
     code_detail_prompt_template,
     blog_outline_prompt_template,
     final_blog_prompt_template,
-    context_blog_prompt_template
+    context_blog_prompt_template,
+    chapter_generation_prompt_template
 )
 
 # Disallowed file extensionsのインポート
@@ -186,6 +187,34 @@ def get_directory_tree(root_dir):
             tree_lines.append(f"{indent}│   ├── {f}")
     return "\n".join(tree_lines)
 
+
+def remove_outer_markdown_fence(text: str) -> str:
+    """
+    テキスト全体が
+        ```markdown
+         ... (任意のテキスト) ...
+        ```
+    の形式で丸ごと囲われている場合のみ、
+    その外側の "```markdown" と "```" を取り除いて返す。
+
+    - 途中にある他のコードブロックは削除しない
+    - 先頭と末尾にあるフェンス記号を取り除くだけ
+    """
+    # 前後の余白を除去したうえで判定する
+    trimmed = text.strip()
+
+    # DOTALLオプションで改行を含めてマッチする
+    # ^```markdown\s*(.*?)\s*```$ という正規表現で
+    # テキスト全体が1つのフェンスにくるまれているかチェック
+    pattern = re.compile(r'^```markdown\s*(.*?)\s*```$', re.DOTALL)
+
+    m = pattern.match(trimmed)
+    if m:
+        # グループ1に包まれていた中身が入っているので、それを返す
+        return m.group(1).strip("\n\r")
+
+    # 全体が包まれていない場合は何も変更しない
+    return text
 ###############################################################################
 # 共通アウトライン生成関数
 ###############################################################################
@@ -390,34 +419,93 @@ def get_full_blog(
     return full_blog
 
 
-def process_final_blog(progress_id, params):
+def process_final_blog_in_chapters(progress_id, params):
+    """
+    章ごとにブログを生成し、最終的なブログ本文をまとめる関数
+    """
+    logger.info(
+        "process_final_blog_in_chapters 開始: progress_id=%s",
+        progress_id)
+    update_progress(progress_id, "Step 6: 章ごとにテックブログを生成中...\n")
+
+    # 必要なデータを取得
+    directory_tree = result_store.get(progress_id + "_tree", "")
+    file_roles = result_store.get(progress_id + "_roles", "")
+    detailed_code_analysis = result_store.get(progress_id + "_analysis", "")
+    project_files_content = result_store.get(progress_id + "_files", "")
+    blog_outline = result_store.get(progress_id + "_outline", "")
+
+    # JSONをパース
     try:
-        logger.info("process_final_blog 開始: progress_id=%s", progress_id)
-        update_progress(progress_id, "Step 6: 最終テックブログ生成中...\n")
-        llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
-        final_chain = final_blog_prompt_template | llm
-
-        initial_response = final_chain.invoke({
-            "directory_tree": result_store.get(progress_id + "_tree", ""),
-            "file_roles": result_store.get(progress_id + "_roles", ""),
-            "detailed_code_analysis": result_store.get(progress_id + "_analysis", ""),
-            "project_files_content": result_store.get(progress_id + "_files", ""),
-            "github_url": params["github_url"],
-            "target_audience": params["target_audience"],
-            "blog_tone": params["blog_tone"],
-            "additional_requirements": params["additional_requirements"],
-            "language": params["language"],
-            "blog_outline": result_store.get(progress_id + "_outline", ""),
-            "existing_blog": result_store.get(progress_id, "")
-        }).content
-
-        full_blog = get_full_blog(llm, initial_response, params, progress_id)
-        result_store[progress_id] = full_blog
-        update_progress(progress_id, "最終テックブログの生成が完了しました。\n")
-        logger.info("process_final_blog 完了: progress_id=%s", progress_id)
+        outline_data = json.loads(blog_outline)
     except Exception as e:
-        update_progress(progress_id, f"最終テックブログ生成中にエラーが発生しました: {e}\n")
-        logger.error("process_final_blog エラー: %s", e)
+        update_progress(progress_id, f"アウトラインJSONのパースに失敗: {e}\n")
+        return
+
+    chapters = outline_data.get("chapters", [])
+    if not chapters:
+        update_progress(progress_id, "アウトライン内にchaptersがありません。\n")
+        return
+
+    llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
+
+    full_blog = ""
+    continue_pattern = re.compile(r"<{1,4}CONTINUE>{1,4}\s*$", re.IGNORECASE)
+
+    for idx, chapter in enumerate(chapters, start=1):
+        update_progress(progress_id, f"Chapter {idx}を生成中...\n")
+
+        chapter_json_str = json.dumps(chapter, ensure_ascii=False)
+        chapter_text_acc = ""
+
+        while True:
+            previous_text_snippet = "\n".join(full_blog.splitlines()[-30:])
+
+            prompt = chapter_generation_prompt_template.format(
+                chapter_json=chapter_json_str,
+                directory_tree=directory_tree,
+                file_roles=file_roles,
+                detailed_code_analysis=detailed_code_analysis,
+                project_files_content=project_files_content,
+                github_url=params.get("github_url", ""),
+                target_audience=params.get("target_audience", ""),
+                blog_tone=params.get("blog_tone", ""),
+                additional_requirements=params.get("additional_requirements", ""),
+                language=params.get("language", "ja"),
+                previous_text=previous_text_snippet
+            )
+            response = llm.invoke(prompt).content
+            response = remove_outer_markdown_fence(response)
+            chapter_text_acc += "\n" + response
+
+            if continue_pattern.search(chapter_text_acc):
+                update_progress(progress_id, "分割出力を検知。続きの生成を取得します...\n")
+                chapter_text_acc = continue_pattern.sub(
+                    "", chapter_text_acc).rstrip()
+            else:
+                break
+
+        # 章分テキストをフルブログに追加
+        full_blog += "\n" + chapter_text_acc
+        update_progress(progress_id, f"Chapter {idx}の生成が完了。\n")
+
+    # ---- ここまでで全章連結した結果が full_blog にある ----
+
+    # 【後処理】 : 1) `<<<CONTINUE>>>` の除去
+    full_blog = re.sub(r"<{1,4}CONTINUE>{1,4}", "", full_blog)
+
+    # 【後処理】 : 2) 外側の ```markdown ... ``` 全体包み込みがあるなら除去
+    full_blog = remove_outer_markdown_fence(full_blog)
+
+    # 必要なら追加でコードブロックの整合性を補正する
+    # full_blog = fix_code_blocks(full_blog)
+
+    # 完成したテキストを保存
+    result_store[progress_id] = full_blog
+    update_progress(progress_id, "最終テックブログの生成が完了しました\n")
+    logger.info(
+        "process_final_blog_in_chapters 完了: progress_id=%s",
+        progress_id)
 
 ###############################################################################
 # SSE 用の進捗更新エンドポイント
@@ -595,25 +683,28 @@ def generate_final_blog():
 
     params = session.get("params", {})
 
-    # アウトライン再生成フラグがある場合は、アウトライン再生成処理を呼び出す
+    # アウトライン再生成フラグがある場合は、まずアウトライン再生成を実行
     if request.form.get("regenerate_outline") == "true":
         update_progress(progress_id, "アウトライン再生成処理を開始します...\n")
         process_outline_regeneration(progress_id, params)
     else:
-        # ユーザーによるアウトライン編集がある場合はその内容を反映
+        # ユーザー編集アウトラインを反映（再生成しない場合）
         if "edited_outline" in request.form:
             edited_outline = request.form.get("edited_outline", "")
             result_store[progress_id + "_outline"] = edited_outline
 
-    # 最終ブログ生成処理を開始する
+    # 最終ブログ生成処理（章ごと生成版）を開始
     session["final_blog_started"] = True
-    update_progress(progress_id, "最終テックブログ生成中...\n")
+    update_progress(progress_id, "最終テックブログ(章ごと)の生成を開始...\n")
+
+    # 従来の process_final_blog ではなく、こちらを呼ぶ
     threading.Thread(
-        target=process_final_blog,
+        target=process_final_blog_in_chapters,  # 章ごと生成
         args=(progress_id, params),
         daemon=True
     ).start()
-    return jsonify({"status": "最終テックブログ生成開始"}), 200
+
+    return jsonify({"status": "最終テックブログ(章ごと)生成開始"}), 200
 
 ###############################################################################
 # ブログ本文再生成（POSTのみ）
@@ -634,7 +725,7 @@ def regenerate_blog():
     session["final_blog_started"] = True
     update_progress(progress_id, "本文による再生成生成中...\n")
     threading.Thread(
-        target=process_final_blog,
+        target=process_final_blog_in_chapters,
         args=(progress_id, params),
         daemon=True
     ).start()
