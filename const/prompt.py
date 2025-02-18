@@ -80,13 +80,29 @@ blog_outline_prompt_template = PromptTemplate(
           "items": [
             {{
               "id": "item_1",
-              "title": "1-2: 項のタイトル",
+              "title": "1-1-1: 項のタイトル",
               "summary": "項の内容の概要",
+              "code_ref": "対応する詳細コード解説の識別子（コードブロックが存在しない場合は空文字列またはnull）"
+            }},
+            {{
+              "id": "item_2",
+              "title": "1-1-2: 項のタイトル",
+              "summary": "別の項の概要",
               "code_ref": "対応する詳細コード解説の識別子（コードブロックが存在しない場合は空文字列またはnull）"
             }}
           ]
+        }},
+        {{
+          "id": "section_2",
+          "title": "1-2: 別の節のタイトル",
+          "items": []
         }}
       ]
+    }},
+    {{
+      "id": "chapter_2",
+      "title": "2章: 別の章のタイトル",
+      "sections": []
     }}
   ]
 }}

@@ -58,6 +58,23 @@ body {
     flex-grow: 1;
 }
 
+/* 初期画面 */
+.box {
+    font-size: 0.75rem;
+    border: 2px solid #ccc;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    max-width: 100%;
+    margin: 20px auto;
+}
+
+/* ボックス内の箇条書きリスト。ボックス内のみに適用 */
+.box ul {
+    padding-left: 20px; /* インデント調整 */
+    list-style-type: disc; /* 黒丸のリストマーカー */
+}
+
 /* フッター */
 footer {
     background-color: #f8f9fa;
