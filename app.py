@@ -725,7 +725,7 @@ def regenerate_blog():
     session["final_blog_started"] = True
     update_progress(progress_id, "本文による再生成生成中...\n")
     threading.Thread(
-        target=process_final_blog,
+        target=process_final_blog_in_chapters,
         args=(progress_id, params),
         daemon=True
     ).start()
