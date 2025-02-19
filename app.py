@@ -517,8 +517,6 @@ def process_final_blog_in_chapters(progress_id, params):
         chapter_text_acc = ""
 
         while True:
-            previous_text_snippet = "\n".join(full_blog.splitlines()[-400:])
-
             prompt = chapter_generation_prompt_template.format(
                 chapter_json=chapter_json_str,
                 directory_tree=directory_tree,
@@ -528,9 +526,10 @@ def process_final_blog_in_chapters(progress_id, params):
                 github_url=params.get("github_url", ""),
                 target_audience=params.get("target_audience", ""),
                 blog_tone=params.get("blog_tone", ""),
-                additional_requirements=params.get("additional_requirements", ""),
+                additional_requirements=params.get(
+                    "additional_requirements", ""),
                 language=params.get("language", "ja"),
-                previous_text=previous_text_snippet
+                previous_text=full_blog  # これまでの生成内容をすべて渡す。一部だけでは繰り返し生成を防げない
             )
             response = llm.invoke(prompt).content
             response = remove_outer_markdown_fence(response)
