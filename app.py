@@ -51,6 +51,10 @@ if not openai_api_key:
         "OPENAI_API_KEY is not set. Please set it in the .env file.")
 logger.info("OPENAI_API_KEY successfully loaded.")
 
+google_api_key = os.getenv("GOOGLE_API_KEY")
+if not google_api_key:
+    raise EnvironmentError("GOOGLE_API_KEY が .env にセットされていません。")
+
 ###############################################################################
 # Flask App Initialization
 ###############################################################################
@@ -100,7 +104,7 @@ def update_progress(progress_id, message):
 result_store = {}
 
 ###############################################################################
-# Helper Functions for Parameter Retrieval
+# Helper Functions
 ###############################################################################
 
 
@@ -110,7 +114,8 @@ def get_common_params_from_form():
         "target_audience": request.form.get("target_audience", "エンジニア全般").strip(),
         "blog_tone": request.form.get("blog_tone", "カジュアルだけど専門性を感じるトーン").strip(),
         "additional_requirements": request.form.get("additional_requirements", "").strip(),
-        "language": request.form.get("language", "ja").strip()
+        "language": request.form.get("language", "ja").strip(),
+        "model": request.form.get("model", "gemini-2.0-flash").strip()  # 追加
     }
 
 
@@ -122,6 +127,22 @@ def get_common_params_from_args():
         "additional_requirements": request.args.get("additional_requirements", ""),
         "language": request.args.get("language", "ja")
     }
+
+
+def get_llm(selected_model, openai_api_key):
+    """
+    選択されたモデルに応じて、適切なLLMオブジェクトを返します。
+    - selected_model が "gemini-*" の場合は ChatGoogleGenerativeAI を利用
+    - それ以外は ChatOpenAI を利用
+    """
+    if selected_model.startswith("gemini"):
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(model=selected_model)
+    else:
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(
+            model_name=selected_model,
+            openai_api_key=openai_api_key)
 
 ###############################################################################
 # Utility functions
@@ -215,6 +236,36 @@ def remove_outer_markdown_fence(text: str) -> str:
 
     # 全体が包まれていない場合は何も変更しない
     return text
+
+
+def remove_outer_json_fence(text: str) -> str:
+    """
+    テキスト全体が
+        ```json
+         ... (任意のテキスト) ...
+        ```
+    の形式で丸ごと囲われている場合のみ、
+    その外側の "```json" と "```" を取り除いて返す。
+
+    - 途中にある他のコードブロックは削除しない
+    - 先頭と末尾にあるフェンス記号を取り除くだけ
+    """
+    # 前後の余白を除去したうえで判定する
+    trimmed = text.strip()
+
+    # DOTALLオプションで改行を含めてマッチする
+    # ^```json\s*(.*?)\s*```$ という正規表現で
+    # テキスト全体が1つのフェンスにくるまれているかチェック
+    pattern = re.compile(r'^```json\s*(.*?)\s*```$', re.DOTALL)
+
+    m = pattern.match(trimmed)
+    if m:
+        # グループ1に包まれていた中身が入っているので、それを返す
+        return m.group(1).strip("\n\r")
+
+    # 全体が包まれていない場合は何も変更しない
+    return text
+
 ###############################################################################
 # 共通アウトライン生成関数
 ###############################################################################
@@ -228,7 +279,8 @@ def generate_outline_common(
         detailed_code_analysis,
         project_files_content):
     update_progress(progress_id, "アウトライン生成中...\n")
-    llm = ChatOpenAI(model_name="o3-mini", openai_api_key=openai_api_key)
+    selected_model = params.get("model", "gemini-2.0-flash")
+    llm = get_llm(selected_model, openai_api_key)
     outline_chain = blog_outline_prompt_template | llm
     blog_outline = outline_chain.invoke({
         "directory_tree": directory_tree,
@@ -241,7 +293,9 @@ def generate_outline_common(
         "additional_requirements": params.get("additional_requirements", ""),
         "language": params.get("language", "")
     }).content
+    blog_outline = remove_outer_json_fence(blog_outline)
     result_store[progress_id + "_outline"] = blog_outline
+
     update_progress(progress_id, "ブログアウトラインの生成が完了しました。\n")
     return blog_outline
 
@@ -252,12 +306,14 @@ def generate_outline_common(
 
 def process_project(
         progress_id,
-        github_url,
-        target_audience,
-        blog_tone,
-        additional_requirements,
-        language,
+        params,
         temp_project_dir):
+    github_url = params.get("github_url", "")
+    target_audience = params.get("target_audience", "エンジニア全般")
+    blog_tone = params.get("blog_tone", "カジュアルだけど専門性を感じるトーン")
+    additional_requirements = params.get("additional_requirements", "")
+    language = params.get("language", "ja")
+
     try:
         update_progress(progress_id, "Step 1: プロジェクトファイルの取得を開始します...\n")
         if os.listdir(temp_project_dir):
@@ -282,7 +338,8 @@ def process_project(
         logger.info("Directory tree obtained.")
 
         update_progress(progress_id, "Step 3: 各ファイルの役割を要約中...\n")
-        llm = ChatOpenAI(model_name="o3-mini", openai_api_key=openai_api_key)
+        selected_model = params.get("model", "gemini-2.0-flash")
+        llm = get_llm(selected_model, openai_api_key)
         file_role_chain = file_role_prompt_template | llm
         file_roles = file_role_chain.invoke(
             {"directory_tree": directory_tree}).content
@@ -447,7 +504,8 @@ def process_final_blog_in_chapters(progress_id, params):
         update_progress(progress_id, "アウトライン内にchaptersがありません。\n")
         return
 
-    llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=openai_api_key)
+    selected_model = params.get("model", "gemini-2.0-flash")
+    llm = get_llm(selected_model, openai_api_key)
 
     full_blog = ""
     continue_pattern = re.compile(r"<{1,4}CONTINUE>{1,4}\s*$", re.IGNORECASE)
@@ -459,7 +517,7 @@ def process_final_blog_in_chapters(progress_id, params):
         chapter_text_acc = ""
 
         while True:
-            previous_text_snippet = "\n".join(full_blog.splitlines()[-30:])
+            previous_text_snippet = "\n".join(full_blog.splitlines()[-400:])
 
             prompt = chapter_generation_prompt_template.format(
                 chapter_json=chapter_json_str,
@@ -623,11 +681,7 @@ def index():
                 target=process_project,
                 args=(
                     progress_id,
-                    github_url,
-                    target_audience,
-                    blog_tone,
-                    additional_requirements,
-                    language,
+                    params,
                     temp_project_dir),
                 daemon=True).start()
 
