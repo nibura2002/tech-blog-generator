@@ -59,8 +59,8 @@ poetry install
 
 ```env
 OPENAI_API_KEY=your_openai_api_key
+GOOGLE_API_KEY=your_gemini_api_key
 FLASK_SECRET_KEY=your_secret_key
-PORT=8080  # 必要に応じて変更
 ```
 
 #### 1.4 アプリケーションを起動
